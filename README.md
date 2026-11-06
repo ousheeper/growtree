@@ -10,24 +10,31 @@
 
 ## 快速开始
 
-**方式一：直接运行 exe（推荐）**
+**方式一：直接运行 exe（仅本地打包，仓库不含二进制）**
 
 | 文件 | 说明 |
 | --- | --- |
 | `dist/GrowTree-1.0.0-portable.exe` | **单文件便携版**（77 MB）。双击即用，免安装、不写注册表，首次启动自解压到临时目录（约 2 秒） |
 | `dist/win-unpacked/GrowTree.exe` | 绿色目录版（269 MB）。解压即用，**插件目录是真实文件，改完能保留** |
 
+这两个文件不进版本库（`.gitignore` 里排掉了），clone 下来后自己跑一次 `npm run dist` 就会生成。
 存档统一在 `%APPDATA%\desktop-growtree\state.json`，和源码版共用；启动日志在 `boot.log`。
 
-**方式二：源码运行**
+**方式二：源码运行（推荐）**
 
 ```bat
+git clone https://github.com/ousheeper/growtree.git
+cd growtree
+npm install
 双击 start.bat
 ```
 
 - 首次运行会自动 `npm install`（走 npmmirror 镜像），之后直接启动。
 - 命令行方式：`npm start`
+- 自己打 exe：`npm run dist`（产物在 `dist/`）；只出目录版用 `npm run dist:dir`。
 - 想换机器/重装：删掉 `node_modules` 后重新双击 `start.bat`。
+
+需要 Node.js 18+ 与 Windows 10/11。
 
 ## 桌面上的操作
 
