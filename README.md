@@ -1,5 +1,9 @@
 # 桌面生长树 · Desktop Grow Tree
 
+[![Release](https://img.shields.io/github/v/release/ousheeper/growtree?color=8b5cf6&label=download)](https://github.com/ousheeper/growtree/releases/latest)
+[![License](https://img.shields.io/github/license/ousheeper/growtree?color=8b5cf6)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-6b7fd7)](https://github.com/ousheeper/growtree/releases/latest)
+
 一个挂在桌面右侧的「会生长的树」小组件：树由程序实时生成，随等级长大，
 枝头会结出**花 / 果 / 菌 / 晶**四类物件（各自独立计数）；
 右侧是**可自由增删、排序、替换的插件栏**（图鉴 / 基因 / 手记 / 专注 / 属性 / 插件管理）。
@@ -10,17 +14,17 @@
 
 ## 快速开始
 
-**方式一：直接运行 exe（仅本地打包，仓库不含二进制）**
+**方式一：下载现成 exe（最省事，推荐）**
 
-| 文件 | 说明 |
-| --- | --- |
-| `dist/GrowTree-1.0.0-portable.exe` | **单文件便携版**（77 MB）。双击即用，免安装、不写注册表，首次启动自解压到临时目录（约 2 秒） |
-| `dist/win-unpacked/GrowTree.exe` | 绿色目录版（269 MB）。解压即用，**插件目录是真实文件，改完能保留** |
+👉 **[下载 GrowTree-1.0.0-portable.exe](https://github.com/ousheeper/growtree/releases/latest)** — 77 MB，单文件便携版
 
-这两个文件不进版本库（`.gitignore` 里排掉了），clone 下来后自己跑一次 `npm run dist` 就会生成。
-存档统一在 `%APPDATA%\desktop-growtree\state.json`，和源码版共用；启动日志在 `boot.log`。
+双击即用：免安装、不写注册表，首次启动自解压到临时目录（约 2 秒）。存档在
+`%APPDATA%\desktop-growtree\state.json`，启动日志是同目录的 `boot.log`。
+没有代码签名证书，首次运行 Windows SmartScreen 会提示"未知发布者" → 点「更多信息 → 仍要运行」。
 
-**方式二：源码运行（推荐）**
+> 便携版每次启动都解压到临时目录，所以**在 exe 里改 `plugins/` 不会保留**。要改插件请用源码版。
+
+**方式二：源码运行（推荐给要改代码的）**
 
 ```bat
 git clone https://github.com/ousheeper/growtree.git
@@ -29,12 +33,10 @@ npm install
 双击 start.bat
 ```
 
-- 首次运行会自动 `npm install`（走 npmmirror 镜像），之后直接启动。
+- 首次运行会自动 `npm install`（走 npmmirror 镜像），之后直接启动
 - 命令行方式：`npm start`
-- 自己打 exe：`npm run dist`（产物在 `dist/`）；只出目录版用 `npm run dist:dir`。
-- 想换机器/重装：删掉 `node_modules` 后重新双击 `start.bat`。
-
-需要 Node.js 18+ 与 Windows 10/11。
+- 自己打 exe：`npm run dist`（便携版）、`npm run dist:dir`（绿色目录版），产物都在 `dist/`，不入库
+- 需要 Node.js 18+ 与 Windows 10/11
 
 ## 桌面上的操作
 
@@ -240,3 +242,9 @@ desktop-growtree/
 - 缩放走 CSS `zoom`，非整数倍（如 105%）时边缘可能有轻微模糊。
 - 便携版 exe 每次启动解压到临时目录，所以**在 exe 里改插件不会保留**；要改插件请用源码版（`start.bat`）或把 `dist/win-unpacked` 整个目录留着用。
 - 代码签名：没有证书，Windows SmartScreen 首次运行会提示"未知发布者"，点「更多信息 → 仍要运行」即可。
+
+## 许可证
+
+[MIT](LICENSE) © 2026 ousheeper
+
+树是程序生成的，没有用任何第三方美术素材；Electron 与 electron-builder 遵循各自的开源许可。
