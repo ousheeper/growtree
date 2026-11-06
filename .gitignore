@@ -1,0 +1,15 @@
+# 依赖与构建产物
+node_modules/
+dist/
+out/
+
+# 调试产物
+ui-*.png
+desktop.png
+el.log
+*.log
+
+# 本地存档 / 系统文件
+state.json
+.DS_Store
+Thumbs.db

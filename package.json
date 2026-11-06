@@ -1,0 +1,53 @@
+{
+  "name": "desktop-growtree",
+  "version": "1.0.0",
+  "description": "Desktop growth tree widget with hot-swappable side panels",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "icon": "node tools/make-icon.js",
+    "dist": "electron-builder --win portable",
+    "dist:dir": "electron-builder --win --dir"
+  },
+  "author": "shang",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.growtree.desktop",
+    "productName": "GrowTree",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "plugins/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "plugins/**/*"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "GrowTree-${version}-portable.exe",
+      "unicode": true
+    },
+    "compression": "normal"
+  }
+}

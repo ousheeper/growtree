@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline';">
+<title>sun</title>
+<style>
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    -webkit-app-region: drag;
+    cursor: grab;
+    user-select: none;
+  }
+  body:active { cursor: grabbing; }
+
+  .wrap {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .orb {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 50% 50%,
+      #fffdf4 0%,
+      #ffe9b4 30%,
+      rgba(255, 213, 138, 0.62) 52%,
+      rgba(255, 190, 96, 0) 72%
+    );
+    box-shadow: 0 0 26px rgba(255, 214, 140, 0.55), 0 0 70px rgba(196, 148, 255, 0.3);
+    animation: pulse 6.5s ease-in-out infinite alternate;
+  }
+  .rays {
+    position: absolute;
+    width: 136px;
+    height: 136px;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+      from 0deg,
+      rgba(255, 228, 168, 0.34) 0deg 2.4deg,
+      rgba(255, 228, 168, 0) 2.4deg 21deg
+    );
+    -webkit-mask: radial-gradient(circle, transparent 46%, #000 58%, transparent 82%);
+    mask: radial-gradient(circle, transparent 46%, #000 58%, transparent 82%);
+    animation: spin 48s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes pulse {
+    from { filter: brightness(0.94); }
+    to { filter: brightness(1.1); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="rays"></div>
+    <div class="orb"></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,313 @@
+/* ============ 图鉴（笔记本样式） ============ */
+.codex { display: flex; flex-direction: column; gap: 10px; }
+
+.codex-book {
+  position: relative;
+  padding: 9px 9px 11px 20px;
+  border-radius: 12px;
+  background:
+    radial-gradient(120% 80% at 10% 0%, rgba(70, 55, 96, 0.55), transparent 60%),
+    linear-gradient(160deg, rgba(30, 24, 44, 0.92), rgba(16, 12, 24, 0.95));
+  border: 1px solid rgba(180, 150, 240, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.4);
+}
+.codex-book::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  bottom: 14px;
+  width: 7px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(180deg, rgba(230, 198, 132, 0.7) 0 3px, rgba(230, 198, 132, 0) 3px 15px);
+  opacity: 0.6;
+}
+
+.codex-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(146, 42, 62, 0.95), rgba(92, 28, 48, 0.72));
+  border: 1px solid rgba(255, 160, 180, 0.28);
+  box-shadow: 0 4px 14px rgba(120, 20, 50, 0.35);
+}
+.codex-head .t { font-size: 11px; letter-spacing: 2px; color: #ffd9e2; }
+.codex-head .n {
+  font-size: 12px;
+  color: #ffe9b8;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+.codex-tabs { display: flex; gap: 4px; margin: 8px 0 7px; }
+.codex-tab {
+  flex: 1;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid transparent;
+  transition: 0.16s;
+}
+.codex-tab:hover { color: var(--ink); }
+.codex-tab.on {
+  color: var(--gold);
+  border-color: rgba(230, 198, 132, 0.45);
+  background: rgba(230, 198, 132, 0.12);
+}
+
+.codex-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+}
+.cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.14s, box-shadow 0.18s;
+  cursor: pointer;
+  overflow: hidden;
+}
+.cell.locked {
+  background: linear-gradient(160deg, rgba(96, 40, 54, 0.85), rgba(40, 20, 30, 0.92));
+  border: 1px solid rgba(214, 84, 110, 0.32);
+  color: rgba(226, 96, 120, 0.75);
+  font-size: 15px;
+  font-weight: 300;
+}
+.cell.unlocked {
+  background: linear-gradient(160deg, #f4ecdc, #d8ccb6);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(120, 100, 70, 0.18), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.cell.unlocked:hover { transform: translateY(-2px) scale(1.06); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(230, 198, 132, 0.8); z-index: 2; }
+.cell.sel { box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(230, 198, 132, 0.6); }
+.cell.new { animation: cellPop 0.6s ease; }
+@keyframes cellPop {
+  0% { transform: scale(0.4); filter: brightness(2.4); }
+  60% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+.cell .rk {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 7px;
+  color: rgba(60, 45, 30, 0.55);
+  font-weight: 700;
+}
+.cell.r4::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  box-shadow: inset 0 0 10px rgba(181, 140, 255, 0.85);
+  pointer-events: none;
+}
+
+.codex-detail {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  min-height: 86px;
+}
+.codex-detail .glyph {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #f4ecdc, #d8ccb6);
+  flex: none;
+}
+.codex-detail .meta { flex: 1; min-width: 0; }
+.codex-detail .nm { font-size: 13px; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+.codex-detail .rar {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  letter-spacing: 1px;
+}
+.codex-detail .ds { font-size: 11px; color: var(--muted); line-height: 1.7; margin-top: 5px; }
+.codex-detail .ph { font-size: 11px; color: var(--dim); line-height: 1.7; margin-top: 4px; }
+
+/* ============ 手记 ============ */
+.jr { display: flex; flex-direction: column; gap: 8px; }
+.jr-head { display: flex; align-items: baseline; justify-content: space-between; }
+.jr-head h3 { font-size: 14px; letter-spacing: 3px; font-weight: 500; }
+.jr-head span { font-size: 10px; color: var(--dim); }
+.jr-list { display: flex; flex-direction: column; gap: 6px; }
+.jr-item {
+  padding: 7px 9px;
+  border-radius: 0 8px 8px 0;
+  border-left: 2px solid var(--line-2);
+  background: rgba(255, 255, 255, 0.028);
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+.jr-item time { display: block; font-size: 9.5px; color: var(--dim); letter-spacing: 0.5px; margin-bottom: 2px; }
+.jr-item[data-k='grow'] { border-left-color: var(--violet); }
+.jr-item[data-k='codex'] { border-left-color: var(--gold); color: #d9cfae; }
+.jr-item[data-k='sys'] { border-left-color: var(--dim); font-style: italic; }
+.jr-item[data-k='feed'] { border-left-color: var(--mint); }
+.jr-empty { font-size: 11px; color: var(--dim); text-align: center; padding: 20px; }
+
+/* ============ 基因编辑器 ============ */
+.gen { display: flex; flex-direction: column; gap: 12px; }
+.gen-head h3 { font-size: 14px; letter-spacing: 3px; font-weight: 500; }
+.gen-group {
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(180, 150, 240, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.gen-gt {
+  font-size: 10.5px;
+  letter-spacing: 3px;
+  color: var(--dim);
+  padding-left: 1px;
+}
+.hint { font-weight: 400; font-size: 9.5px; color: var(--dim); letter-spacing: 0; }
+.hint-line { font-size: 10.5px; color: var(--dim); line-height: 1.6; }
+
+.sp-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.sp-row:hover { border-color: var(--line-2); }
+.sp-n { display: flex; flex-direction: column; font-size: 12px; color: var(--ink); }
+.sp-n small { font-size: 9px; color: var(--dim); margin-top: 1px; }
+.gen-head p { font-size: 11px; color: var(--dim); margin-top: 4px; line-height: 1.6; }
+.gen-row { display: flex; flex-direction: column; gap: 5px; }
+.gen-row .lb { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.gen-row .lb b { color: var(--gold); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+input[type='range'] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(181, 140, 255, 0.75), rgba(124, 91, 255, 0.35));
+  outline: none;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #f0e8ff;
+  border: 1px solid rgba(124, 91, 255, 0.9);
+  box-shadow: 0 0 8px rgba(181, 140, 255, 0.8);
+  cursor: pointer;
+}
+
+.palettes { display: flex; gap: 6px; }
+.pal {
+  flex: 1;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  transition: 0.18s;
+}
+.pal:hover { border-color: var(--line-2); }
+.pal.on { border-color: var(--gold); color: var(--ink); box-shadow: 0 0 0 1px rgba(230, 198, 132, 0.35); }
+.pal .dots { display: flex; gap: 2px; }
+.pal .dots i { width: 6px; height: 6px; border-radius: 50%; }
+
+.seedrow { display: flex; gap: 8px; align-items: center; }
+.seedrow input[type='number'] {
+  flex: 1;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  outline: none;
+}
+.seedrow input[type='number']:focus { border-color: var(--line-2); }
+
+/* ============ 属性 ============ */
+.stats { display: flex; flex-direction: column; gap: 10px; }
+.stats h3 { font-size: 14px; letter-spacing: 3px; font-weight: 500; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat-sec {
+  font-size: 10.5px;
+  letter-spacing: 3px;
+  color: var(--dim);
+  margin: 4px 0 -4px 2px;
+}
+.stat {
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+}
+.stat .k { font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+.stat .v { font-size: 19px; color: var(--ink); font-weight: 300; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 10px; color: var(--dim); margin-left: 2px; }
+.stat.big { grid-column: span 2; }
+.stat.big .v { font-size: 26px; color: var(--gold); }
+
+/* ============ 专注钟 ============ */
+.pomo { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 6px; }
+.pomo h3 { font-size: 14px; letter-spacing: 3px; font-weight: 500; align-self: flex-start; }
+.ring {
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: conic-gradient(var(--violet) var(--deg, 0deg), rgba(255, 255, 255, 0.07) 0);
+  transition: background 0.4s linear;
+  box-shadow: 0 0 40px rgba(124, 91, 255, 0.18), inset 0 0 30px rgba(0, 0, 0, 0.5);
+}
+.ring::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, rgba(40, 30, 60, 0.95), rgba(12, 9, 18, 1));
+  border: 1px solid rgba(180, 150, 240, 0.2);
+}
+.ring .time { position: relative; font-size: 34px; font-weight: 200; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+.ring .lbl { position: absolute; bottom: 56px; font-size: 10px; letter-spacing: 3px; color: var(--dim); }
+.pomo-ctrls { display: flex; gap: 8px; }
+.pomo-tip { font-size: 11px; color: var(--dim); text-align: center; line-height: 1.7; }
