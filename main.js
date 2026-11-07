@@ -22,9 +22,39 @@ app.setPath(
     ? path.resolve(process.argv[__udIdx + 1])
     : path.join(app.getPath('appData'), 'desktop-growtree')
 );
-const TREE_WIDTH = 470;
-const PANEL_WIDTH = 380;
+/* ---- 设计尺寸：页面按 1:1 排版，整体再用 zoom 缩放 ----
+ * 窗口尺寸 = 设计尺寸 × z，两边必须严格一致，否则树就会在屏幕上乱跳。
+ */
+const STAGE_W = 470; // 树区设计宽度
+const PANEL_W = 380; // 插件面板设计宽度
+const TRAY_H = 74; // 底部基座设计高度（树根离窗口底边这么远）
+const STAGE_H0 = 940; // 树区设计高度默认值
+const STAGE_H_MIN = 560;
+const STAGE_H_MAX = 1400;
+const Z_MIN = 0.6;
+const Z_MAX = 1.5;
 const EDGE_GAP = 14;
+
+// 主进程也留一份几何，托盘对齐太阳时要用
+const geom = { z: 1, stageH: STAGE_H0, panelOpen: true };
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const designW = (g) => STAGE_W + (g.panelOpen ? PANEL_W : 0);
+const geomSize = (g) => ({ width: Math.round(designW(g) * g.z), height: Math.round(g.stageH * g.z) });
+
+function readGeom(saved) {
+  const ui = (saved && saved.ui) || {};
+  const b = ui.bounds;
+  const z = clamp(Number(ui.scale) || 1, Z_MIN, Z_MAX);
+  let stageH = Number(ui.stageH) || 0;
+  // 兼容老存档：没有 stageH 时用窗口高度反推（老版本存的是物理像素，除以 z 才是设计高度）
+  if (!stageH && b && b.height) stageH = Math.round(b.height / z);
+  return {
+    z,
+    stageH: clamp(stageH || STAGE_H0, STAGE_H_MIN, STAGE_H_MAX),
+    panelOpen: ui.panelOpen !== false
+  };
+}
 
 let win = null;
 let sunWin = null;
@@ -141,6 +171,23 @@ function writeState(data) {
   }
 }
 
+/* 窗口位置：变化后让渲染进程存一次盘（state:save 会把最新 bounds 合进去） */
+let boundsTimer = null;
+function rememberBounds(now) {
+  clearTimeout(boundsTimer);
+  const send = () => {
+    if (win && !win.isDestroyed()) win.webContents.send('cmd', { type: 'flush-state' });
+  };
+  if (now) send();
+  else boundsTimer = setTimeout(send, 700);
+}
+function flushBounds() {
+  if (!win || win.isDestroyed()) return;
+  const s = readState() || {};
+  s.ui = Object.assign({}, s.ui, { bounds: win.getBounds() });
+  writeState(s);
+}
+
 /* ---------------- 托盘图标（纯代码生成 PNG，避免额外资源文件） ---------------- */
 let CRC_TABLE = null;
 function crc32(buf) {
@@ -216,37 +263,44 @@ function workArea() {
   return d.workArea;
 }
 
-function defaultBounds() {
-  const wa = workArea();
-  const height = Math.max(620, Math.min(940, wa.height - 40));
-  return {
-    width: TREE_WIDTH,
-    height,
-    x: wa.x + wa.width - TREE_WIDTH - EDGE_GAP,
-    y: wa.y + 24
-  };
-}
-
 function createWindow() {
   const saved = readState();
   const ui = (saved && saved.ui) || {};
-  let bounds = ui.bounds;
-  if (!bounds || typeof bounds.x !== 'number') bounds = defaultBounds();
+  const g = readGeom(saved);
   const wa = workArea();
-  bounds.width = Math.max(TREE_WIDTH, Math.min(1400, bounds.width || TREE_WIDTH));
-  bounds.height = Math.max(620, Math.min(wa.height, bounds.height || 800));
-  bounds.x = Math.max(wa.x - 100, Math.min(bounds.x, wa.x + wa.width - 120));
-  bounds.y = Math.max(wa.y - 60, Math.min(bounds.y, wa.y + wa.height - 200));
+  // 屏幕换小了 / 首次启动：别让窗口比工作区还高
+  if (g.stageH * g.z > wa.height - 4) g.stageH = Math.max(STAGE_H_MIN, Math.floor((wa.height - 4) / g.z));
+  geom.z = g.z;
+  geom.stageH = g.stageH;
+  geom.panelOpen = g.panelOpen;
+
+  const size = geomSize(g);
+  const sb = ui.bounds;
+  let x;
+  let y;
+  if (sb && typeof sb.x === 'number') {
+    // 老存档的宽高可能是被 minWidth/minHeight 卡出来的，这里按设计尺寸重新摆：
+    // 左边不动（树区在窗口左侧，树就不会横向漂），底边不动（树根不会上下漂）
+    x = Math.round(sb.x);
+    y = Math.round(sb.y + (sb.height || size.height) - size.height);
+  } else {
+    x = wa.x + wa.width - size.width - EDGE_GAP;
+    y = wa.y + 24;
+  }
+  x = Math.round(clamp(x, wa.x - size.width + 120, wa.x + wa.width - 120));
+  y = Math.round(clamp(y, wa.y - 40, wa.y + wa.height - 160));
+  const bounds = { x, y, width: size.width, height: size.height };
 
   win = new BrowserWindow({
     ...bounds,
-    minWidth: TREE_WIDTH,
-    minHeight: 620,
+    minWidth: 240,
+    minHeight: 280,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
     hasShadow: false,
-    resizable: true,
+    // 原生拖边会和「窗口 = 设计尺寸 × zoom」打架，所以关掉，改由页面里的 .rz 热区接管
+    resizable: false,
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
@@ -446,25 +500,16 @@ function createWindow() {
     if (ui.passThrough) setPassThrough(true, false);
   });
 
-  let saveTimer = null;
-  const rememberBounds = () => {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      if (!win || win.isDestroyed()) return;
-      const b = win.getBounds();
-      const s = readState() || {};
-      s.ui = Object.assign({}, s.ui, { bounds: b });
-      writeState(s);
-    }, 600);
+  // 注意：'moved' 只有 macOS 才有，Windows 上得听 'move'
+  const onGeomChange = () => {
+    rememberBounds();
+    broadcastSunSoon();
+    broadcastBoundsSoon();
   };
-  win.on('moved', () => {
-    rememberBounds();
-    broadcastSun();
-  });
-  win.on('resized', () => {
-    rememberBounds();
-    broadcastSun();
-  });
+  win.on('move', onGeomChange);
+  win.on('resize', onGeomChange);
+  win.on('moved', onGeomChange);
+  win.on('resized', onGeomChange);
   win.webContents.on('did-finish-load', () => setTimeout(broadcastSun, 400));
   win.on('close', (e) => {
     if (!quitting) {
@@ -482,8 +527,7 @@ function createSunWindow() {
   const wa = workArea();
   // 首次启动：把太阳放在树冠正上方（而不是屏幕 24% 处——那会让树永远往左倒）
   const tb = win && !win.isDestroyed() ? win.getBounds() : null;
-  const panelOpen = ((readState() || {}).ui || {}).panelOpen !== false;
-  const treeW = tb ? tb.width * (TREE_WIDTH / (TREE_WIDTH + (panelOpen ? PANEL_WIDTH : 0))) : TREE_WIDTH;
+  const treeW = tb ? STAGE_W * geom.z : STAGE_W;
   const defX = tb ? tb.x + treeW / 2 : wa.x + wa.width * 0.5;
   const defY = tb ? Math.max(wa.y + SUN_SIZE / 2 + 6, tb.y + 34) : wa.y + wa.height * 0.14;
   const cx = typeof saved.x === 'number' ? saved.x : defX;
@@ -531,9 +575,7 @@ function alignSunOverTree() {
   if (!sunWin || sunWin.isDestroyed() || !win || win.isDestroyed()) return;
   const wa = workArea();
   const tb = win.getBounds();
-  const st = readState() || {};
-  const panelOpen = ((st.ui || {}).panelOpen !== false);
-  const treeW = tb.width * (TREE_WIDTH / (TREE_WIDTH + (panelOpen ? PANEL_WIDTH : 0)));
+  const treeW = STAGE_W * geom.z;
   const half = SUN_SIZE / 2;
   const cx = tb.x + treeW / 2;
   const cy = Math.max(wa.y + half + 6, tb.y + 30);
@@ -564,6 +606,26 @@ function broadcastSun(extra) {
   );
 }
 
+/* 拖动窗口/缩放时 moved/resized 会连发几十次，节流一下，别让渲染进程重绘整棵树 */
+let sunTimer = null;
+function broadcastSunSoon() {
+  if (sunTimer) return;
+  sunTimer = setTimeout(() => {
+    sunTimer = null;
+    broadcastSun();
+  }, 90);
+}
+
+/* 窗口矩形变了就告诉渲染进程一声（用户拖顶栏挪窗口时，页面里的坐标也要跟上） */
+let boundsTimer2 = null;
+function broadcastBoundsSoon() {
+  if (boundsTimer2) return;
+  boundsTimer2 = setTimeout(() => {
+    boundsTimer2 = null;
+    if (win && !win.isDestroyed()) win.webContents.send('bounds', win.getBounds());
+  }, 50);
+}
+
 ipcMain.handle('sun:get', () => {
   if (!sunWin || sunWin.isDestroyed() || !win || !sunAligned) return null;
   const sb = sunWin.getBounds();
@@ -590,17 +652,6 @@ function setPassThrough(on, broadcast) {
   }
 }
 
-function setPanelOpen(open) {
-  if (!win || win.isDestroyed()) return;
-  const b = win.getBounds();
-  const wa = workArea();
-  const target = open ? TREE_WIDTH + PANEL_WIDTH : TREE_WIDTH;
-  if (b.width === target) return;
-  const right = b.x + b.width;
-  let x = Math.max(wa.x, right - target);
-  win.setBounds({ x, y: b.y, width: target, height: b.height }, true);
-}
-
 function toggleVisible() {
   if (!win) return;
   if (win.isVisible() && win.isFocused()) {
@@ -615,11 +666,44 @@ function toggleVisible() {
 
 /* ---------------- IPC ---------------- */
 ipcMain.handle('state:load', () => readState());
-ipcMain.handle('state:save', (_e, data) => writeState(data));
-ipcMain.handle('win:panel', (_e, open) => {
-  setPanelOpen(open);
-  return true;
+ipcMain.handle('state:save', (_e, data) => {
+  // 窗口位置由主进程说了算：渲染进程存盘时把最新的 bounds 合进去，
+  // 否则每次 Store.save() 都会把 moved 事件记下的位置冲掉。
+  if (data && typeof data === 'object' && win && !win.isDestroyed()) {
+    data.ui = Object.assign({}, data.ui, { bounds: win.getBounds() });
+  }
+  return writeState(data);
 });
+
+/* 渲染进程拿当前窗口矩形 + 工作区，自己算缩放/面板要多大 */
+ipcMain.handle('win:geom', () => ({
+  bounds: win && !win.isDestroyed() ? win.getBounds() : null,
+  workArea: workArea(),
+  geom: Object.assign({}, geom)
+}));
+
+/* 渲染进程算好目标矩形，这里只负责落位 + 兜底夹取 */
+ipcMain.handle('win:bounds', (_e, b) => {
+  if (!win || win.isDestroyed() || !b) return null;
+  const wa = workArea();
+  const width = clamp(Math.round(b.width) || 300, 240, wa.width);
+  const height = clamp(Math.round(b.height) || 300, 280, wa.height);
+  const x = clamp(Math.round(b.x), wa.x - width + 100, wa.x + wa.width - 100);
+  const y = clamp(Math.round(b.y), wa.y - height + 100, wa.y + wa.height - 100);
+  win.setBounds({ x, y, width, height });
+  rememberBounds();
+  broadcastBoundsSoon();
+  return win.getBounds();
+});
+
+/* 同步设计参数（太阳对齐、记住的尺寸要用） */
+ipcMain.on('geom:set', (_e, g) => {
+  if (!g) return;
+  if (typeof g.z === 'number') geom.z = clamp(g.z, Z_MIN, Z_MAX);
+  if (typeof g.stageH === 'number') geom.stageH = clamp(g.stageH, STAGE_H_MIN, STAGE_H_MAX);
+  if (typeof g.panelOpen === 'boolean') geom.panelOpen = g.panelOpen;
+});
+
 ipcMain.handle('win:top', (_e, on) => {
   if (!win) return false;
   win.setAlwaysOnTop(!!on, 'floating');
@@ -634,22 +718,6 @@ ipcMain.handle('win:overlay', (_e, on) => {
 ipcMain.handle('win:through', (_e, on, silent) => {
   setPassThrough(on, !silent);
   return passThrough;
-});
-ipcMain.handle('win:scale', (_e, w, h) => {
-  if (!win || win.isDestroyed()) return false;
-  const b = win.getBounds();
-  const wa = workArea();
-  const width = Math.max(320, Math.min(1700, Math.round(w)));
-  const height = Math.max(420, Math.min(wa.height, Math.round(h)));
-  const right = b.x + b.width;
-  const bottom = b.y + b.height;
-  win.setBounds({
-    x: Math.round(Math.max(wa.x - 40, right - width)),
-    y: Math.round(Math.max(wa.y - 40, bottom - height)),
-    width,
-    height
-  });
-  return true;
 });
 
 ipcMain.handle('plugins:list', () => {
@@ -744,6 +812,7 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     quitting = true;
+    flushBounds();
     stopKeyWatcher();
   });
 

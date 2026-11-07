@@ -1,20 +1,29 @@
 /**
  * 操作特效层：水壶倒水 / 剪刀剪枝 / 收获入篮 / 升级光环
  * 全部是 DOM + CSS 动画，用完即焚，不参与树的渲染。
- * 坐标用视口坐标（clientX/Y），和 #fx 覆盖层一致。
+ * 入参是视口坐标（clientX/Y）；页面整体 zoom 过，落到层里要换成设计坐标。
  */
 (function () {
   'use strict';
 
   const layer = () => document.getElementById('fx');
 
+  function toLocal(x, y) {
+    const host = layer();
+    const z = parseFloat(document.documentElement.style.zoom) || 1;
+    if (!host) return { x: x / z, y: y / z };
+    const r = host.getBoundingClientRect();
+    return { x: (x - r.left) / z, y: (y - r.top) / z };
+  }
+
   function spawn(cls, x, y, inner, ttl) {
     const host = layer();
     if (!host) return null;
+    const p = toLocal(x, y);
     const el = document.createElement('div');
     el.className = 'fx-item ' + cls;
-    el.style.left = Math.round(x) + 'px';
-    el.style.top = Math.round(y) + 'px';
+    el.style.left = Math.round(p.x) + 'px';
+    el.style.top = Math.round(p.y) + 'px';
     el.innerHTML = inner;
     host.appendChild(el);
     setTimeout(() => el.remove(), ttl || 1600);

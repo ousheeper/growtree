@@ -14,28 +14,48 @@
   const MAX_CUT_RATIO = 0.5;
   const ASK_CUT_RATIO = 0.12;
 
+  /* 几何：页面按设计尺寸 1:1 排版，整体用 zoom 缩放；窗口 = 设计尺寸 × z。
+   * 三个数必须和 main.js 里的一致，否则窗口和内容对不上就会「跳」。 */
+  const DESIGN = { stageW: 470, panelW: 380, trayH: 74 };
+  const Z_MIN = 0.6;
+  const Z_MAX = 1.5;
+  const STAGE_H_MIN = 560;
+  const STAGE_H_MAX = 1400;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
   const App = {
     built: null,
     panelOpen: true,
+    panelShown: true, // 窗口当前是否已经包含面板那一列
     userThrough: false,
     ignoring: false,
+    z: 1,
+    stageH: 940,
+    bounds: null,
+    workArea: null,
 
     async boot() {
       await Store.init();
+      const ui = Store.state.ui;
+      this.panelOpen = ui.panelOpen !== false;
+      this.panelShown = this.panelOpen;
+      this.z = clamp(Number(ui.scale) || 1, Z_MIN, Z_MAX);
+      // 老存档没有 stageH：用窗口高度反推一次
+      this.stageH = clamp(Number(ui.stageH) || 940, STAGE_H_MIN, STAGE_H_MAX);
+      // 先套缩放，保证第一帧就和窗口对齐
+      document.documentElement.style.zoom = this.z;
       Host.init();
       await this.loadPlugins();
       this.bindUi();
       this.bindStore();
       this.bindNative();
-      this.scale = 1;
-      this.baseHeight = Store.state.ui.baseHeight || 942;
+      await this.initGeom();
       this.applyUiFlags();
       this._booted = true;
-      if ((Store.state.ui.scale || 1) !== 1) setTimeout(() => this.applyScale(Store.state.ui.scale, false), 120);
       if (window.native && window.native.onKeys) window.native.onKeys((p) => this.onKeys(p));
       this.mountInitial();
       await this.initSun();
-      this.setMode(Store.state.ui.mode || 'water');
+      this.setMode(ui.mode || 'water');
       this.renderTree(false);
       this.updateBar();
       this.startLoop();
@@ -369,7 +389,7 @@
       const wb = this.winBounds;
       if (!sun || !wb) return null;
       const treeW = 470;
-      const panelW = this.panelOpen ? 380 : 0;
+      const panelW = this.panelShown ? 380 : 0;
       // 树区在窗口里占的宽度比例，树根位于树区水平中点、竖直 85.5% 处
       const treeCx = 0.5 * (treeW / (treeW + panelW));
       const groundFy = 0.855;
@@ -387,6 +407,9 @@
       if (!payload) return;
       this.sunPos = { x: payload.x, y: payload.y };
       this.winBounds = payload.win;
+      // 用户拖顶栏挪窗口时也走这条路：把本地矩形同步回来，
+      // 否则后面算缩放会拿着旧坐标，一算就歪
+      if (payload.win && !this._rzDrag) this.bounds = Object.assign({}, payload.win);
       Store.state.sun = { x: payload.x, y: payload.y };
       if (payload.fresh) {
         // 首启对齐：之前那一帧是按占位坐标冻结的，作废重算
@@ -441,8 +464,8 @@
       $('#btnHide').onclick = () => window.native.hide();
 
       // 缩放
-      $('#zoomOut').onclick = () => this.applyScale((this.scale || 1) - 0.05, true);
-      $('#zoomIn').onclick = () => this.applyScale((this.scale || 1) + 0.05, true);
+      $('#zoomOut').onclick = () => this.applyScale(this.z - 0.05, true);
+      $('#zoomIn').onclick = () => this.applyScale(this.z + 0.05, true);
 
       const feedAt = (x, y) => this.feed(x, y);
       $('#trunkHit').addEventListener('click', (e) => {
@@ -485,23 +508,18 @@
         (e) => {
           if (!e.ctrlKey) return;
           e.preventDefault();
-          this.applyScale(this.scale + (e.deltaY > 0 ? -0.05 : 0.05), true);
+          this.applyScale(this.z + (e.deltaY > 0 ? -0.05 : 0.05), true);
         },
         { passive: false }
       );
 
-      // 窗口尺寸变化时记下新的基准高度
-      window.addEventListener('resize', () => {
-        if (!this._booted) return;
-        Store.state.ui.baseHeight = Math.round(window.innerHeight);
-        Store.saveSoon(1200);
-      });
+      this.bindResize();
 
       // 透明区域穿透：只有真正落在 UI 上的鼠标才被窗口拦截
       let raf = null;
       let last = { x: 0, y: 0 };
       document.addEventListener('mousemove', (e) => {
-        if (this.userThrough || this._draggingSun) return;
+        if (this.userThrough || this._draggingSun || this._rzDrag) return;
         last = { x: e.clientX, y: e.clientY };
         if (raf) return;
         raf = requestAnimationFrame(() => {
@@ -513,22 +531,224 @@
       });
     },
 
-    applyScale(next, persist) {
-      const z = Math.max(0.7, Math.min(1.5, Math.round((Number(next) || 1) * 100) / 100));
-      this.scale = z;
+    /* ---------- 窗口几何 ---------- */
+    /* 页面是设计尺寸，整体 zoom；窗口 = 设计尺寸 × z，两边必须一致 */
+    designW() {
+      return DESIGN.stageW + (this.panelShown ? DESIGN.panelW : 0);
+    },
+
+    maxZFor(stageH) {
+      const wa = this.workArea || { x: 0, y: 0, width: 1920, height: 1080 };
+      return Math.min(Z_MAX, (wa.width - 6) / this.designW(), (wa.height - 6) / (stageH || this.stageH));
+    },
+
+    /* 放大上限：不能超过工作区 */
+    maxZ() {
+      return this.maxZFor(this.stageH);
+    },
+
+    async initGeom() {
+      try {
+        const g = await window.native.geom();
+        if (g) {
+          this.bounds = g.bounds;
+          this.workArea = g.workArea;
+        }
+      } catch (e) {
+        /* ignore */
+      }
+      if (!this.bounds) {
+        this.bounds = { x: 0, y: 0, width: Math.round(this.designW() * this.z), height: Math.round(this.stageH * this.z) };
+      }
+      // 换过显示器 / 存档比屏幕还大：先把缩放和高度收进工作区
+      if (this.workArea) {
+        const wa = this.workArea;
+        const zCap = Math.min(Z_MAX, (wa.height - 8) / this.stageH, (wa.width - 8) / this.designW());
+        if (this.z > zCap) {
+          this.z = Math.max(Z_MIN, Math.round(zCap * 100) / 100);
+          document.documentElement.style.zoom = this.z;
+          Store.state.ui.scale = this.z;
+        }
+        const maxH = Math.floor((wa.height - 6) / this.z);
+        if (this.stageH > maxH) this.stageH = Math.max(STAGE_H_MIN, maxH);
+      }
+      // 老存档的窗口尺寸可能被 minWidth/minHeight 卡歪过：按设计尺寸重新摆一遍，
+      // 左边和底边不动（树在窗口左侧居中、树根贴底），所以树不会跳
+      const w = Math.round(this.designW() * this.z);
+      const h = Math.round(this.stageH * this.z);
+      if (Math.abs(w - this.bounds.width) > 1 || Math.abs(h - this.bounds.height) > 1) {
+        await this.commitBounds(
+          { x: this.bounds.x, y: this.bounds.y + this.bounds.height - h, width: w, height: h },
+          true
+        );
+      }
+      this.syncZoomLabel();
+      window.native.setGeom({ z: this.z, stageH: this.stageH, panelOpen: this.panelOpen });
+    },
+
+    /* 落位：immediate 用于布局性变更（开机 / 缩放），其余按帧合并，拖动时不会堆积 IPC */
+    async commitBounds(next, immediate) {
+      if (!next) return this.bounds;
+      this.bounds = {
+        x: Math.round(next.x),
+        y: Math.round(next.y),
+        width: Math.round(next.width),
+        height: Math.round(next.height)
+      };
+      if (immediate) {
+        try {
+          const a = await window.native.setBounds(this.bounds);
+          if (a) this.bounds = a;
+        } catch (e) {
+          /* ignore */
+        }
+        return this.bounds;
+      }
+      if (!this._boundsRaf) {
+        this._boundsRaf = requestAnimationFrame(() => {
+          this._boundsRaf = null;
+          if (this.bounds) window.native.setBounds(this.bounds);
+        });
+      }
+      return this.bounds;
+    },
+
+    setZoom(z) {
+      this.z = z;
       Store.state.ui.scale = z;
       document.documentElement.style.zoom = z;
-      const baseH = Store.state.ui.baseHeight || 942;
-      const w = Math.round((470 + (this.panelOpen ? 380 : 0)) * z);
-      const h = Math.round(baseH * z);
-      window.native.setAppScale(w, h);
+      window.native.setGeom({ z, stageH: this.stageH, panelOpen: this.panelOpen });
+      this.syncZoomLabel();
+      Bus.emit('scale', z);
+    },
+
+    syncZoomLabel() {
       const zl = document.getElementById('zoomVal');
-      if (zl) zl.textContent = Math.round(z * 100) + '%';
+      if (zl) zl.textContent = Math.round(this.z * 100) + '%';
+    },
+
+    /* 缩放：以树根（树区底边中点）为锚点，脚下的土不动，只是整体变大变小 */
+    applyScale(next, persist) {
+      if (!this.bounds) return;
+      const want = Math.round((Number(next) || 1) * 100) / 100;
+      const zMax = this.maxZ();
+      const z = clamp(want, Z_MIN, zMax);
+      if (Math.abs(z - this.z) < 0.001) {
+        this.syncZoomLabel();
+        if (persist) this.toast(want > zMax ? '已经放到最大了，屏幕装不下' : '已经缩到最小了');
+        return;
+      }
+      const rootX = this.bounds.x + (DESIGN.stageW / 2) * this.z;
+      const rootY = this.bounds.y + (this.stageH - DESIGN.trayH) * this.z;
+      const w = Math.round(this.designW() * z);
+      const h = Math.round(this.stageH * z);
+      const wa = this.workArea || { x: 0, y: 0, width: 1920, height: 1080 };
+      // 树根尽量钉住；只有窗口顶到屏幕上边时才整体下移（下移多少，树就长多少）
+      const x = Math.round(clamp(rootX - (DESIGN.stageW / 2) * z, wa.x - 20, wa.x + wa.width - w + 20));
+      const y = Math.round(clamp(rootY - (this.stageH - DESIGN.trayH) * z, wa.y, wa.y + wa.height - h));
+      this.setZoom(z);
+      this.commitBounds({ x, y, width: w, height: h });
       if (persist) {
         Store.saveSoon();
         this.toast('缩放 ' + Math.round(z * 100) + '%');
       }
-      Bus.emit('scale', z);
+    },
+
+    /* ---------- 拖边缩放 ---------- */
+    bindResize() {
+      document.querySelectorAll('.rz').forEach((h) => {
+        h.addEventListener('pointerdown', (e) => this.startResize(e, h.dataset.edge));
+      });
+    },
+
+    startResize(e, edge) {
+      if (e.button !== 0 || !this.bounds) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch (err) {
+        /* ignore */
+      }
+      this._rz = {
+        edge,
+        sx: e.screenX,
+        sy: e.screenY,
+        b: Object.assign({}, this.bounds),
+        z: this.z,
+        stageH: this.stageH,
+        panelOpen: this.panelOpen
+      };
+      this._rzDrag = true;
+      document.body.classList.add('rz-on');
+      const move = (ev) => this.onResizeMove(ev);
+      const up = () => this.endResize();
+      this._rz.move = move;
+      this._rz.up = up;
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    },
+
+    onResizeMove(ev) {
+      const s = this._rz;
+      if (!s) return;
+      const dx = ev.screenX - s.sx;
+      const dy = ev.screenY - s.sy;
+      const wa = this.workArea || { x: 0, y: 0, width: 1920, height: 1080 };
+      const dw = this.designW();
+      const right0 = s.b.x + s.b.width;
+      const bottom0 = s.b.y + s.b.height;
+      const horiz = s.edge.indexOf('w') >= 0 || s.edge.indexOf('e') >= 0;
+      const vertN = s.edge.indexOf('n') >= 0;
+      const vertS = s.edge.indexOf('s') >= 0;
+      // 这次拖动能用多高：往上拖看上边余量，往下拖看下边余量
+      const availH = vertN ? bottom0 - wa.y : wa.y + wa.height - s.b.y;
+
+      let z = s.z;
+      let stageH = s.stageH;
+      // 横向拖 → 改缩放；纵向拖 → 改树区高度（只是多留点天空，树本身比例不变）
+      if (horiz) {
+        const w = Math.max(240, s.edge.indexOf('w') >= 0 ? s.b.width - dx : s.b.width + dx);
+        z = clamp(w / dw, Z_MIN, Math.min(this.maxZFor(stageH), availH / s.stageH));
+      }
+      if (vertN || vertS) {
+        const h = Math.max(280, vertS ? s.b.height + dy : s.b.height - dy);
+        stageH = clamp(Math.min(h, availH) / z, STAGE_H_MIN, STAGE_H_MAX);
+      }
+      z = Math.round(z * 1000) / 1000;
+      stageH = Math.round(stageH);
+
+      const w = Math.round(dw * z);
+      const h = Math.round(stageH * z);
+      // 被拖的那条边跟手，对面那条边钉住
+      const x = Math.round(clamp(s.edge.indexOf('w') >= 0 ? right0 - w : s.b.x, wa.x - 40, wa.x + wa.width - w + 40));
+      const y = Math.round(vertN ? bottom0 - h : s.b.y);
+
+      this.z = z;
+      this.stageH = stageH;
+      Store.state.ui.scale = z;
+      Store.state.ui.stageH = stageH;
+      document.documentElement.style.zoom = z;
+      this.syncZoomLabel();
+      this.commitBounds({ x, y, width: w, height: h });
+    },
+
+    endResize() {
+      const s = this._rz;
+      if (!s) return;
+      window.removeEventListener('pointermove', s.move);
+      window.removeEventListener('pointerup', s.up);
+      window.removeEventListener('pointercancel', s.up);
+      this._rz = null;
+      this._rzDrag = false;
+      document.body.classList.remove('rz-on');
+      Store.state.ui.scale = this.z;
+      Store.state.ui.stageH = this.stageH;
+      Store.saveSoon(200);
+      window.native.setGeom({ z: this.z, stageH: this.stageH, panelOpen: this.panelOpen });
+      Bus.emit('scale', this.z);
+      this.setIgnore(false);
     },
 
     setIgnore(on) {
@@ -580,8 +800,34 @@
       $('#btnPanel').classList.toggle('on', open);
       Store.state.ui.panelOpen = open;
       Store.saveSoon();
-      if (this.scale && this.scale !== 1) this.applyScale(this.scale, false);
-      else window.native.setPanel(open);
+      window.native.setGeom({ z: this.z, stageH: this.stageH, panelOpen: open });
+      clearTimeout(this._panelTimer);
+      if (open) {
+        this.panelShown = true;
+        this.fitPanelWidth();
+      } else {
+        // 等面板滑出去再收窗口，不然是"啪"地一下消失
+        this._panelTimer = setTimeout(() => {
+          if (this.panelOpen) return;
+          this.panelShown = false;
+          this.fitPanelWidth();
+        }, 260);
+      }
+    },
+
+    /* 只改宽度：右边缘、上边缘、下边缘全部不动，
+     * 所以树只会横向让出面板的位置，绝不会往下掉 */
+    fitPanelWidth() {
+      if (!this.bounds) return;
+      const w = Math.round(this.designW() * this.z);
+      const right = this.bounds.x + this.bounds.width;
+      const wa = this.workArea || { x: 0, width: 1920 };
+      this.commitBounds({
+        x: Math.round(clamp(right - w, wa.x, wa.x + wa.width - w)),
+        y: this.bounds.y,
+        width: w,
+        height: this.bounds.height
+      });
     },
 
     setTopMode(on) {
@@ -601,7 +847,6 @@
       this.panelOpen = ui.panelOpen !== false;
       $('#panel').classList.toggle('open', this.panelOpen);
       $('#btnPanel').classList.toggle('on', this.panelOpen);
-      window.native.setPanel(this.panelOpen);
 
       const topOn = ui.alwaysOnTop !== false;
       $('#btnTop').classList.toggle('on', topOn);
@@ -649,9 +894,15 @@
     },
 
     bindNative() {
+      if (window.native.onBounds) {
+        window.native.onBounds((b) => {
+          if (b && !this._rzDrag) this.bounds = Object.assign({}, b);
+        });
+      }
       window.native.onCommand((cmd) => {
         if (!cmd || !cmd.type) return;
         if (cmd.type === 'toggle-panel') this.togglePanel();
+        else if (cmd.type === 'flush-state') Store.save();
         else if (cmd.type === 'feed') this.feed(window.innerWidth / 2 - 60, window.innerHeight - 110);
         else if (cmd.type === 'passthrough') {
           // 来自托盘/热键：只同步 UI，不再回写主进程
@@ -688,6 +939,16 @@
     },
 
     /* ---------- 特效 ---------- */
+    /* 鼠标事件给的是视口坐标；页面整体 zoom 过，
+     * #floats / #fx 里的 left/top 是设计坐标，得先除以 z，否则动画会歪。 */
+    toLayer(x, y) {
+      const host = document.getElementById('fx');
+      const z = this.z || 1;
+      if (!host) return { x: x / z, y: y / z };
+      const r = host.getBoundingClientRect();
+      return { x: (x - r.left) / z, y: (y - r.top) / z };
+    },
+
     toast(text) {
       const el = $('#toast');
       el.textContent = text;
@@ -697,24 +958,26 @@
     },
 
     floatText(x, y, text) {
+      const p = this.toLayer(x, y);
       const el = document.createElement('div');
       el.className = 'float-txt';
       el.textContent = text;
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
       $('#floats').appendChild(el);
       setTimeout(() => el.remove(), 1600);
     },
 
     sparks(x, y, n) {
+      const p = this.toLayer(x, y);
       const wrap = $('#floats');
       for (let i = 0; i < n; i++) {
         const s = document.createElement('div');
         s.className = 'spark';
         const a = Math.random() * Math.PI * 2;
         const d = 30 + Math.random() * 60;
-        s.style.left = x + 'px';
-        s.style.top = y + 'px';
+        s.style.left = p.x + 'px';
+        s.style.top = p.y + 'px';
         s.style.setProperty('--dx', Math.cos(a) * d + 'px');
         s.style.setProperty('--dy', Math.sin(a) * d - 20 + 'px');
         s.style.background = Math.random() < 0.5 ? 'var(--violet)' : 'var(--gold)';

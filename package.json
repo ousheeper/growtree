@@ -1,6 +1,6 @@
 {
   "name": "desktop-growtree",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Desktop growth tree widget with hot-swappable side panels",
   "main": "main.js",
   "scripts": {

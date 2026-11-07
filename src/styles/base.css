@@ -382,6 +382,59 @@ body.mode-harvest .fab { display: inline-flex; }
 }
 .levelbar .pct { font-size: 11px; color: var(--muted); width: 32px; text-align: right; font-variant-numeric: tabular-nums; }
 
+/* ============ 拖边缩放 ============ */
+/* 贴着窗口边缘的 7px 热区：移到边上亮一条线，按住就能拖着改大小 */
+.rz {
+  position: absolute;
+  z-index: 22;
+  touch-action: none;
+}
+.rz.n, .rz.s { left: 10px; right: 10px; height: 7px; }
+.rz.w, .rz.e { top: 10px; bottom: 10px; width: 7px; }
+.rz.n { top: 0; cursor: ns-resize; }
+.rz.s { bottom: 0; cursor: ns-resize; }
+.rz.w { left: 0; cursor: ew-resize; }
+.rz.e { right: 0; cursor: ew-resize; }
+.rz.nw, .rz.ne, .rz.sw, .rz.se { width: 13px; height: 13px; }
+.rz.nw { top: 0; left: 0; cursor: nwse-resize; }
+.rz.se { bottom: 0; right: 0; cursor: nwse-resize; }
+.rz.ne { top: 0; right: 0; cursor: nesw-resize; }
+.rz.sw { bottom: 0; left: 0; cursor: nesw-resize; }
+
+.rz::after {
+  content: '';
+  position: absolute;
+  opacity: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.rz.n::after, .rz.s::after {
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(181, 140, 255, 0), rgba(181, 140, 255, 0.9), rgba(181, 140, 255, 0));
+}
+.rz.n::after { top: 3px; }
+.rz.s::after { bottom: 3px; }
+.rz.w::after, .rz.e::after {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(181, 140, 255, 0), rgba(181, 140, 255, 0.9), rgba(181, 140, 255, 0));
+}
+.rz.w::after { left: 3px; }
+.rz.e::after { right: 3px; }
+.rz.nw::after, .rz.ne::after, .rz.sw::after, .rz.se::after {
+  width: 13px;
+  height: 13px;
+  left: 4px;
+  top: 4px;
+  background: radial-gradient(circle, rgba(206, 178, 255, 0.95), rgba(181, 140, 255, 0) 70%);
+}
+.rz:hover::after { opacity: 1; }
+body.rz-on .rz::after { opacity: 1; }
+
 /* ============ 浮动反馈 ============ */
 .floats { position: absolute; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
 .float-txt {
@@ -438,6 +491,8 @@ body.mode-harvest .fab { display: inline-flex; }
   width: var(--panel-w);
   flex: 0 0 var(--panel-w);
   height: 100%;
+  position: relative;
+  z-index: 24; /* 盖住右侧那条缩放热区，面板里的滚动条才拖得动 */
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, rgba(22, 17, 33, 0.94), rgba(10, 8, 16, 0.96));
