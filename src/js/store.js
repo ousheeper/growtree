@@ -200,6 +200,18 @@
       return gain;
     },
 
+    /* 摸一下：只给一点生长值，冷却 1.2 秒，不产养分 */
+    poke() {
+      const now = Date.now();
+      if (this._lastPoke && now - this._lastPoke < 1200) return null;
+      this._lastPoke = now;
+      const s = this.state;
+      s.stats.pokes = (s.stats.pokes || 0) + 1;
+      this.addXp(1, 'poke');
+      this.saveSoon();
+      return 1;
+    },
+
     /* 键盘：由主进程按 2 秒一批推过来 */
     addKeys(n) {
       const s = this.state;

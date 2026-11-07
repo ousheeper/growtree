@@ -206,6 +206,8 @@
       Store.saveSoon();
       document.body.classList.toggle('mode-prune', mode === 'prune');
       document.body.classList.toggle('mode-harvest', mode === 'harvest');
+      document.body.classList.toggle('mode-poke', mode === 'poke');
+      document.body.classList.toggle('mode-water', mode === 'water');
       const svg = document.getElementById('tree');
       if (svg) svg.classList.toggle('ui-hit', mode !== 'water');
       document.querySelectorAll('#modes .mode').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
@@ -261,6 +263,14 @@
       Store.log(`剪去一枝（连带 ${info.cut} 根），树把养分挪给了别的枝头。`, 'grow');
       this.updateFab();
       this.renderDock();
+    },
+
+    poke(x, y) {
+      const gain = Store.poke();
+      if (window.Fx) window.Fx.poke(x, y);
+      if (gain == null) return;
+      this.floatText(x, y - 14, '+1');
+      this.updateBar();
     },
 
     /* 应用内确认框：返回 Promise<boolean> */
@@ -458,6 +468,8 @@
         } else if (this.mode === 'harvest') {
           const d = e.target.closest('.deco');
           if (d) this.harvestEls([d]);
+        } else if (this.mode === 'poke') {
+          this.poke(e.clientX, e.clientY);
         }
       });
 
@@ -552,11 +564,8 @@
       this.updateSoil();
       this.floatText(x, y, '+' + gain);
       this.sparks(x, y, 6);
-      if (window.Fx) {
-        // 水壶锚到盆口（SVG 里 potTop=638），而不是鼠标点
-        const pot = this.svgPt(230, 638);
-        window.Fx.water(pot ? pot.x : x, pot ? pot.y : y);
-      }
+      // 水壶就在你点的地方倒水
+      if (window.Fx) window.Fx.water(x, y);
       this.updateBar();
       this.renderDock();
       if (Store.state.stats.clicks % 6 === 0) {
