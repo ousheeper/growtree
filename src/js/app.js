@@ -4,6 +4,7 @@
 (function () {
   'use strict';
   const $ = (s) => document.querySelector(s);
+  const fmtKeys = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n));
 
   // 冻结倾斜的算法版本：换算法时旧数据不可信，需要整批重算
   const TILT_VER = 2;
@@ -26,6 +27,7 @@
       this.applyUiFlags();
       this._booted = true;
       if ((Store.state.ui.scale || 1) !== 1) setTimeout(() => this.applyScale(Store.state.ui.scale, false), 120);
+      if (window.native && window.native.onKeys) window.native.onKeys((p) => this.onKeys(p));
       this.mountInitial();
       await this.initSun();
       this.setMode(Store.state.ui.mode || 'water');
@@ -76,6 +78,26 @@
     },
 
     /* ---------- 树 ---------- */
+    /* 只改数字，避免整块重绘 */
+    updateSoil() {
+      const el = document.querySelector('[data-slot="soil"] .n');
+      if (el) el.textContent = Math.round(Store.state.soil || 0);
+    },
+
+    updateKeys() {
+      const el = document.querySelector('[data-slot="keys"] .n');
+      if (el) el.textContent = fmtKeys(Store.state.stats.keysToday || 0);
+    },
+
+    /* 键盘计数由主进程推过来 */
+    onKeys(payload) {
+      if (!payload || !payload.n) return;
+      const res = Store.addKeys(payload.n);
+      this.updateKeys();
+      this.updateBar();
+      if (res && res.nut > 0) this.toast('敲击 ' + (Store.state.stats.keysToday || 0) + ' 下 · 养分 +' + res.nut);
+    },
+
     renderTree(animate) {
       const svg = document.getElementById('tree');
       const st = Store.state;
@@ -124,13 +146,15 @@
         { k: '果', n: sp.fruit, c: palette.fruit[0] },
         { k: '菌', n: sp.mushroom, c: palette.shroom[0] },
         { k: '晶', n: sp.crystal, c: palette.crystal[0] },
+        { k: '水', n: Math.round(s.soil || 0), c: '#7fc7ff', id: 'soil' },
         { k: '养分', n: s.nutrient, c: '#7fe6b0' },
+        { k: '键', n: fmtKeys(s.stats.keysToday || 0), c: '#b8a6ff', id: 'keys' },
         { k: '词条', n: s.codex.length, c: '#e6c684' }
       ];
       $('#slots').innerHTML = items
         .map(
           (i) =>
-            `<div class="slot" title="${i.k}"><i class="dot" style="background:${i.c}"></i><span class="n">${i.n}</span><span class="k">${i.k}</span></div>`
+            `<div class="slot" data-slot="${i.id || ''}" title="${i.k}"><i class="dot" style="background:${i.c}"></i><span class="n">${i.n}</span><span class="k">${i.k}</span></div>`
         )
         .join('');
     },
@@ -432,7 +456,14 @@
 
     feed(x, y) {
       const gain = Store.feed();
-      if (gain == null) return;
+      if (gain == null) {
+        const soil = Store.state.soil;
+        if (typeof soil === 'number' && soil > 100 - 18) {
+          this.toast('土还湿着，等它干一点再浇（' + Math.round(soil) + '%）');
+        }
+        return;
+      }
+      this.updateSoil();
       this.floatText(x, y, '+' + gain);
       this.sparks(x, y, 6);
       if (window.Fx) {
@@ -556,6 +587,7 @@
         if (document.hidden) return;
         Store.tick(dt);
         this.updateBar();
+        this.updateSoil();
       }, 1000);
       setInterval(() => Store.save(), 30000);
     },

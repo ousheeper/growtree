@@ -28,7 +28,52 @@ const EDGE_GAP = 14;
 
 let win = null;
 let sunWin = null;
-let sunAligned = false; // 首启时太阳还没摆到树冠上方，此时不要给渲染进程报坐标
+let sunAligned = false;
+
+/* ---------------- 键盘敲击统计 ---------------- */
+let keyWatcher = null;
+let keyTimer = null;
+let keyBuf = 0;
+let keyTotal = 0;
+
+function startKeyWatcher() {
+  try {
+    const { uIOhook } = require('uiohook-napi');
+    const down = new Set();
+    uIOhook.on('keydown', (e) => {
+      // 长按会连发 keydown，这里按"按下/抬起"配对，只算真实敲击
+      if (down.has(e.keycode)) return;
+      down.add(e.keycode);
+      keyBuf += 1;
+    });
+    uIOhook.on('keyup', (e) => down.delete(e.keycode));
+    uIOhook.start();
+    keyWatcher = uIOhook;
+    keyTimer = setInterval(flushKeys, 2000);
+    bootLog('[keys] watcher started');
+  } catch (e) {
+    bootLog('[keys] watcher failed: ' + (e && e.message));
+  }
+}
+
+function flushKeys() {
+  if (!keyBuf) return;
+  const n = keyBuf;
+  keyBuf = 0;
+  keyTotal += n;
+  if (win && !win.isDestroyed()) win.webContents.send('keys', { n, total: keyTotal });
+}
+
+function stopKeyWatcher() {
+  if (keyTimer) clearInterval(keyTimer);
+  keyTimer = null;
+  try {
+    if (keyWatcher) keyWatcher.stop();
+  } catch (e) {
+    /* ignore */
+  }
+  keyWatcher = null;
+} // 首启时太阳还没摆到树冠上方，此时不要给渲染进程报坐标
 let tray = null;
 let quitting = false;
 let passThrough = false;
@@ -685,6 +730,7 @@ if (!gotLock) {
     app.setAppUserModelId('com.growtree.desktop');
     createWindow();
     createSunWindow();
+    startKeyWatcher();
     buildTray();
     globalShortcut.register('Ctrl+Alt+T', toggleVisible);
     globalShortcut.register('Ctrl+Alt+L', () => setPassThrough(!passThrough, true));
@@ -698,6 +744,7 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     quitting = true;
+    stopKeyWatcher();
   });
 
   app.on('will-quit', () => {

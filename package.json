@@ -1,6 +1,6 @@
 {
   "name": "desktop-growtree",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Desktop growth tree widget with hot-swappable side panels",
   "main": "main.js",
   "scripts": {
@@ -31,7 +31,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "plugins/**/*"
+      "plugins/**/*",
+      "node_modules/uiohook-napi/**/*"
     ],
     "win": {
       "icon": "build/icon.ico",
@@ -49,5 +50,8 @@
       "unicode": true
     },
     "compression": "normal"
+  },
+  "dependencies": {
+    "uiohook-napi": "^1.5.5"
   }
 }

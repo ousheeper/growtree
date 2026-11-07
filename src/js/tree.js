@@ -185,12 +185,15 @@
 
   function drawDeco(d, pal) {
     const s = d.species;
-    if (s === 'bloom') return bloom(d.x, d.y, d.sc, d.c1, d.c2, pal.heart);
-    if (s === 'bell') return bell(d.x, d.y, d.sc, d.c1, d.c2);
-    if (s === 'eye') return eye(d.x, d.y, d.sc, d.c1);
-    if (s === 'fruit') return berry(d.x, d.y, d.sc, pal.fruit, pal.barkA);
-    if (s === 'mushroom') return shroom(d.x, d.y, d.sc, pal.shroom, pal.heart);
-    return crystal(d.x, d.y, d.sc, pal.crystal);
+    const stem = d.hang
+      ? `<path d="M${r1(d.hang.ax)},${r1(d.hang.ay)} Q${r1(d.hang.cx)},${r1(d.hang.cy)} ${r1(d.x)},${r1(d.y - d.sc * 4)}" fill="none" stroke="${pal.barkB}" stroke-width="1.1" opacity=".9" stroke-linecap="round"/>`
+      : '';
+    if (s === 'bloom') return stem + bloom(d.x, d.y, d.sc, d.c1, d.c2, pal.heart);
+    if (s === 'bell') return stem + bell(d.x, d.y, d.sc, d.c1, d.c2);
+    if (s === 'eye') return stem + eye(d.x, d.y, d.sc, d.c1);
+    if (s === 'fruit') return stem + berry(d.x, d.y, d.sc, pal.fruit, pal.barkA);
+    if (s === 'mushroom') return stem + shroom(d.x, d.y, d.sc, pal.shroom, pal.heart);
+    return stem + crystal(d.x, d.y, d.sc, pal.crystal);
   }
 
   /* ---------------- 生成 ---------------- */
@@ -411,6 +414,10 @@
       }
     }
 
+    // 垂枝只挑树冠下半缘的枝头，否则会被叶子挡住看不见
+    const tipYs = tips.map((t) => t.y).sort((a, b) => a - b);
+    const lowHalfY = tipYs.length ? tipYs[Math.floor(tipYs.length * 0.55)] : GROUND;
+
     function pickSpecies(R) {
       const pool = [];
       for (const k of allowed) {
@@ -421,6 +428,7 @@
       return pool[(R() * pool.length) | 0];
     }
 
+    let hangCount = 0;
     for (const t of tips) {
       if (picked.has(t.path)) continue;
       const major = majorOf(t.path);
@@ -443,15 +451,33 @@
 
       catCount[SPECIES[sp].cat] += 1;
       const ci = (rollC * pal.flower.length) | 0;
+
+      // 垂枝：有一部分不挂在枝头，而是从枝头垂下来
+      const hangChance = { fruit: 0.8, bell: 0.85, bloom: 0.5 }[sp] || 0;
+      const hangRoll = SR();
+      // 至少保证一颗垂枝，否则低等级时可能一颗都看不到
+      const inLow = t.y > lowHalfY && t.y < GROUND - 70;
+      const inX = t.x > 26 && t.x < W - 26; // 太靠边的会被画布裁掉
+      const forceHang = hangCount === 0 && hangChance > 0 && t.y < GROUND - 90 && inX;
+      const canHang = hangChance > 0 && inX && t.y < GROUND - 70 && ((hangRoll < hangChance && inLow) || forceHang);
+      if (canHang) hangCount += 1;
+      const hangLen = canHang ? 22 + SR() * 20 : 0;
+      const sway = canHang ? (SR() - 0.5) * 9 : 0;
+      const hx = t.x + sway * 1.15;
+      const hy = t.y + hangLen;
+
       decos.push({
         species: sp,
         id: t.path,
-        x: t.x,
-        y: t.y,
-        sc: 0.82 + rollD * 0.42,
+        x: canHang ? hx : t.x,
+        y: canHang ? hy : t.y,
+        sc: (canHang ? 1.02 : 0.82) + rollD * 0.42,
         c1: sp === 'eye' ? pal.flower[0] : pal.flower[ci],
         c2: pal.flower[(ci + 1) % pal.flower.length],
-        delay: (rollD * 4).toFixed(2)
+        delay: (rollD * 4).toFixed(2),
+        hang: canHang
+          ? { ax: t.x, ay: t.y, len: hangLen, cx: t.x + sway * 0.45, cy: t.y + hangLen * 0.62 }
+          : null
       });
     }
 

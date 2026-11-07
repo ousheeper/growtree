@@ -18,6 +18,13 @@
   };
 
   const TICK_MS = 4000; // 每 4 秒 +1 生长值
+  // 浇水上限：土壤湿度模型（浇一次 +18，自然风干 0.3/秒，湿透时不再吸收）
+  const SOIL_MAX = 100;
+  const SOIL_POUR = 18;
+  const SOIL_DRY = 0.3;
+  // 键盘：每 40 键 +1 生长值，每 200 键 +1 养分
+  const KEY_XP_EVERY = 40;
+  const KEY_NUT_EVERY = 200;
   const CLICK_XP = 4;
   const CLICK_CD = 650;
 
@@ -54,6 +61,7 @@
         level: 1,
         xp: 0,
         nutrient: 0,
+        soil: 62,
         totalXp: 0,
         bornAt: Date.now(),
         sun: null,
@@ -65,7 +73,7 @@
         genes: Object.assign({}, DEFAULT_GENES),
         codex: [],
         journal: [],
-        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 } },
+        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0 },
         plugins: { enabled: null, order: null, active: 'codex' },
         ui: { panelOpen: true, alwaysOnTop: true, overlay: false, passThrough: false, scale: 1, mode: 'water' }
       };
@@ -85,6 +93,13 @@
       if (!Array.isArray(s.journal)) s.journal = [];
       if (!Array.isArray(s.pruned)) s.pruned = [];
       if (!Array.isArray(s.picked)) s.picked = [];
+      if (typeof s.soil !== 'number') s.soil = 62;
+      // 键盘统计按天重置
+      const today = new Date().toDateString();
+      if (s.stats.keyDay !== today) {
+        s.stats.keyDay = today;
+        s.stats.keysToday = 0;
+      }
       s.stats.sessions = (s.stats.sessions || 0) + 1;
 
       // 离线生长结算
@@ -96,6 +111,8 @@
           this.overlay = { seconds: elapsed, gain };
         }
       }
+      // 离线期间土壤也会风干
+      s.soil = Math.max(0, s.soil - elapsed * SOIL_DRY);
       s.lastSeen = Date.now();
       this.state = s;
       this.tickAcc = 0;
@@ -152,6 +169,8 @@
     },
 
     tick(dt) {
+      const s = this.state;
+      if (s && typeof s.soil === 'number') s.soil = Math.max(0, s.soil - (dt / 1000) * SOIL_DRY);
       this.tickAcc = (this.tickAcc || 0) + dt;
       while (this.tickAcc >= TICK_MS) {
         this.tickAcc -= TICK_MS;
@@ -162,14 +181,45 @@
     feed(source) {
       const now = Date.now();
       if (this._lastClick && now - this._lastClick < CLICK_CD) return null;
-      this._lastClick = now;
       const s = this.state;
+      // 土壤湿透就不再吸收：这是浇水的硬上限
+      const soil = typeof s.soil === 'number' ? s.soil : 62;
+      if (soil > SOIL_MAX - SOIL_POUR) {
+        this._lastClick = now; // 也吃冷却，避免连点刷提示
+        return null;
+      }
+      this._lastClick = now;
+      s.soil = Math.min(SOIL_MAX, soil + SOIL_POUR);
       s.stats.clicks = (s.stats.clicks || 0) + 1;
       s.nutrient += 1;
       const gain = CLICK_XP + (Math.random() < 0.18 ? 2 : 0);
       this.addXp(gain, 'feed');
       this.saveSoon();
       return gain;
+    },
+
+    /* 键盘：由主进程按 2 秒一批推过来 */
+    addKeys(n) {
+      const s = this.state;
+      if (!s || !n) return null;
+      const st = s.stats;
+      st.keysToday = (st.keysToday || 0) + n;
+      st.keysTotal = (st.keysTotal || 0) + n;
+      this._keyXpAcc = (this._keyXpAcc || 0) + n;
+      this._keyNutAcc = (this._keyNutAcc || 0) + n;
+      const xp = Math.floor(this._keyXpAcc / KEY_XP_EVERY);
+      if (xp > 0) {
+        this._keyXpAcc -= xp * KEY_XP_EVERY;
+        this.addXp(xp, 'keys');
+      }
+      const nut = Math.floor(this._keyNutAcc / KEY_NUT_EVERY);
+      if (nut > 0) {
+        this._keyNutAcc -= nut * KEY_NUT_EVERY;
+        s.nutrient += nut;
+        st.keyNut = (st.keyNut || 0) + nut;
+      }
+      this.saveSoon(2500);
+      return { xp, nut };
     },
 
     unlockRandom() {

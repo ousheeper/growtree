@@ -31,6 +31,7 @@
         <div class="stats">
           <h3>属 性</h3>
           <div class="stat-grid" id="stTop"></div>
+          <div class="hint-line" style="margin:-2px 2px 0">键盘为全局统计：每 40 次敲击 +1 生长值，每 200 次 +1 养分。</div>
 
           <div class="stat-sec">当前这棵树</div>
           <div class="stat-grid" id="stTree"></div>
@@ -60,6 +61,10 @@
           card('本轮进度', Math.floor(Store.xpPercent) + '<small>%</small>'),
           card('已收录词条', `${s.codex.length}<small>/${window.CODEX_ITEMS.length}</small>`),
           card('浇灌次数', s.stats.clicks || 0),
+          card('土壤湿度', Math.round(s.soil || 0) + '<small>%</small>'),
+          card('今日敲击', (s.stats.keysToday || 0).toLocaleString()),
+          card('累计敲击', (s.stats.keysTotal || 0).toLocaleString()),
+          card('敲击换养分', s.stats.keyNut || 0),
           card('存活时长', dur(alive))
         ].join('');
 

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('native', {
   getSun: () => ipcRenderer.invoke('sun:get'),
   setSunTop: (on) => ipcRenderer.invoke('sun:top', on),
   onSun: (cb) => ipcRenderer.on('sun', (_e, payload) => cb(payload)),
+  onKeys: (cb) => ipcRenderer.on('keys', (_e, payload) => cb(payload)),
   listPlugins: () => ipcRenderer.invoke('plugins:list'),
   openPluginsDir: () => ipcRenderer.invoke('plugins:open'),
   reloadPlugins: () => ipcRenderer.invoke('plugins:reload'),
