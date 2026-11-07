@@ -84,6 +84,7 @@
         ask: (opts) => (window.__app ? window.__app.askConfirm(opts) : Promise.resolve(false)),
         on: (evt, fn) => Bus.on(evt, fn),
         scale: (v) => window.__app && window.__app.applyScale(v, true),
+        uiFlag: (k, v) => window.__app && window.__app.setUiFlag(k, v),
         plugins: () => this.all(),
         switchTo: (pid) => this.mount(pid)
       };

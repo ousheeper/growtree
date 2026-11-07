@@ -71,6 +71,10 @@
               <input type="range" id="gScale" min="0.7" max="1.5" step="0.05" value="${ctx.state.ui.scale || 1}">
             </div>
             <div class="hint-line">也可以按住 Ctrl 在小组件上滚动滚轮</div>
+            <label class="gen-toggle">
+              <span class="lb"><span>上下栏只在鼠标移入时出现</span><small>移开后淡出，桌面上只留一棵树</small></span>
+              <span class="switch"><input type="checkbox" id="gBars" ${ctx.state.ui.barsAutoHide ? 'checked' : ''}><i></i></span>
+            </label>
           </div>
 
           <div class="gen-group">
@@ -143,6 +147,10 @@
         syncScale();
         ctx.scale(Number(scaleInput.value));
       };
+
+      /* 上下栏自动隐藏 */
+      const barsCb = root.querySelector('#gBars');
+      barsCb.onchange = () => ctx.uiFlag('barsAutoHide', barsCb.checked);
 
       /* 花色 */
       const pal = root.querySelector('#gPal');

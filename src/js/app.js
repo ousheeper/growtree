@@ -519,12 +519,22 @@
 
       this.bindResize();
 
+      // 鼠标整个移出组件时不会再有 mousemove，这里补一刀
+      document.addEventListener('mouseleave', () => {
+        if (document.body.classList.contains('bars-auto')) document.body.classList.remove('bars-show');
+      });
+
       // 透明区域穿透：只有真正落在 UI 上的鼠标才被窗口拦截
       let raf = null;
       let last = { x: 0, y: 0 };
       document.addEventListener('mousemove', (e) => {
-        if (this.userThrough || this._draggingSun || this._rzDrag) return;
+        // 上下栏的显隐要放在穿透判断之前：穿透时也要跟着鼠标收放
         last = { x: e.clientX, y: e.clientY };
+        this._lastPt = last;
+        if (document.body.classList.contains('bars-auto')) {
+          document.body.classList.toggle('bars-show', this.inStage(last.x, last.y));
+        }
+        if (this.userThrough || this._draggingSun || this._rzDrag) return;
         if (raf) return;
         raf = requestAnimationFrame(() => {
           raf = null;
@@ -533,6 +543,35 @@
           this.setIgnore(!hit);
         });
       });
+    },
+
+    /* 鼠标是不是在树区（含上下栏所在的整列）里 */
+    inStage(x, y) {
+      const st = document.querySelector('.stage');
+      if (!st) return false;
+      const r = st.getBoundingClientRect();
+      const pad = 6;
+      return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+    },
+
+    /* 上下栏自动隐藏开关 */
+    applyBarsAuto() {
+      const on = !!Store.state.ui.barsAutoHide;
+      document.body.classList.toggle('bars-auto', on);
+      if (!on) {
+        document.body.classList.remove('bars-show');
+        return;
+      }
+      const p = this._lastPt;
+      document.body.classList.toggle('bars-show', !p || this.inStage(p.x, p.y));
+    },
+
+    setUiFlag(key, value) {
+      if (key !== 'barsAutoHide') return;
+      Store.state.ui.barsAutoHide = !!value;
+      Store.saveSoon();
+      this.applyBarsAuto();
+      this.toast(value ? '上下栏改成鼠标移入才出现' : '上下栏恢复常驻');
     },
 
     /* ---------- 窗口几何 ---------- */
@@ -882,6 +921,7 @@
       this.userThrough = !!ui.passThrough;
       $('#btnThrough').classList.toggle('on', this.userThrough);
       if (this.userThrough) window.native.setThrough(true);
+      this.applyBarsAuto();
     },
 
     /* ---------- 事件 ---------- */

@@ -155,6 +155,17 @@ path.br.draw { stroke-dashoffset: 0; }
 .chip.icon { width: 26px; padding: 0; justify-content: center; }
 .chip.on { color: var(--gold); background: rgba(230, 198, 132, 0.12); }
 
+/* ============ 上下栏自动隐藏 ============ */
+/* 开着这个开关时，鼠标不在树区里就把上下两条栏淡掉，桌面只留一棵树 */
+body.bars-auto:not(.bars-show) .topbar,
+body.bars-auto:not(.bars-show) .base,
+body.bars-auto:not(.bars-show) .zoomer,
+body.bars-auto:not(.bars-show) .fab {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
 /* ============ 拖动握把 & 缩放器 ============ */
 .grip {
   width: 16px;
