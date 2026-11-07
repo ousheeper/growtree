@@ -14,7 +14,14 @@ const UNPACKED = app.isPackaged ? __dirname.replace('app.asar', 'app.asar.unpack
 const PLUGIN_DIR = path.join(UNPACKED, 'plugins');
 
 // 固定 userData，保证开发版和 exe 版共用同一份存档
-app.setPath('userData', path.join(app.getPath('appData'), 'desktop-growtree'));
+// --userdata <dir> 可隔离出测试档，方便同时跑多个实例
+const __udIdx = process.argv.indexOf('--userdata');
+app.setPath(
+  'userData',
+  __udIdx > 0 && process.argv[__udIdx + 1]
+    ? path.resolve(process.argv[__udIdx + 1])
+    : path.join(app.getPath('appData'), 'desktop-growtree')
+);
 const TREE_WIDTH = 470;
 const PANEL_WIDTH = 380;
 const EDGE_GAP = 14;
@@ -427,8 +434,14 @@ const SUN_SIZE = 76;
 function createSunWindow() {
   const saved = (readState() && readState().sun) || {};
   const wa = workArea();
-  const cx = typeof saved.x === 'number' ? saved.x : wa.x + wa.width * 0.24;
-  const cy = typeof saved.y === 'number' ? saved.y : wa.y + wa.height * 0.16;
+  // 首次启动：把太阳放在树冠正上方（而不是屏幕 24% 处——那会让树永远往左倒）
+  const tb = win && !win.isDestroyed() ? win.getBounds() : null;
+  const panelOpen = ((readState() || {}).ui || {}).panelOpen !== false;
+  const treeW = tb ? tb.width * (TREE_WIDTH / (TREE_WIDTH + (panelOpen ? PANEL_WIDTH : 0))) : TREE_WIDTH;
+  const defX = tb ? tb.x + treeW / 2 : wa.x + wa.width * 0.5;
+  const defY = tb ? Math.max(wa.y + SUN_SIZE / 2 + 6, tb.y + 34) : wa.y + wa.height * 0.14;
+  const cx = typeof saved.x === 'number' ? saved.x : defX;
+  const cy = typeof saved.y === 'number' ? saved.y : defY;
   const half = SUN_SIZE / 2;
   const x = Math.round(Math.min(Math.max(cx - half, wa.x - half), wa.x + wa.width - half));
   const y = Math.round(Math.min(Math.max(cy - half, wa.y - half), wa.y + wa.height - half));
@@ -453,6 +466,10 @@ function createSunWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: false }
   });
   sunWin.loadFile(path.join(ROOT, 'src', 'sun.html'));
+  // 首启：等主窗口定位完成后再把太阳摆到树冠正上方（创建瞬间的 bounds 还不可靠）
+  if (typeof saved.x !== 'number') {
+    sunWin.once('ready-to-show', () => setTimeout(alignSunOverTree, 500));
+  }
   sunWin.setAlwaysOnTop(true, 'floating');
   sunWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   sunWin.once('ready-to-show', () => sunWin.showInactive());
@@ -462,8 +479,27 @@ function createSunWindow() {
   });
 }
 
-function broadcastSun() {
-  if (!win || win.isDestroyed()) return;
+/* 把太阳摆到树区正上方（首次启动，或用户从菜单里点"重置太阳位置"） */
+function alignSunOverTree() {
+  if (!sunWin || sunWin.isDestroyed() || !win || win.isDestroyed()) return;
+  const wa = workArea();
+  const tb = win.getBounds();
+  const st = readState() || {};
+  const panelOpen = ((st.ui || {}).panelOpen !== false);
+  const treeW = tb.width * (TREE_WIDTH / (TREE_WIDTH + (panelOpen ? PANEL_WIDTH : 0)));
+  const half = SUN_SIZE / 2;
+  const cx = tb.x + treeW / 2;
+  const cy = Math.max(wa.y + half + 6, tb.y + 30);
+  sunWin.setBounds({
+    x: Math.round(Math.min(Math.max(cx - half, wa.x - half), wa.x + wa.width - half)),
+    y: Math.round(Math.min(Math.max(cy - half, wa.y - half), wa.y + wa.height - half)),
+    width: SUN_SIZE,
+    height: SUN_SIZE
+  });
+  broadcastSun();
+}
+
+function broadcastSun() {  if (!win || win.isDestroyed()) return;
   if (!sunWin || sunWin.isDestroyed()) return;
   const sb = sunWin.getBounds();
   win.webContents.send('sun', {

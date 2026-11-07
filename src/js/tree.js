@@ -238,7 +238,10 @@
      */
     const sunPull = params.sunPull == null ? 0.8 : Math.max(0, Math.min(1.2, params.sunPull));
     let sunTilt = 0; // 当前太阳角（只用于光照表现）
-    if (params.sun && sunPull > 0) {
+    if (typeof params.sunTilt === 'number') {
+      // 推荐路径：渲染层直接算好"相对竖直方向的太阳角"（弧度），这里只做强度与夹紧
+      sunTilt = Math.max(-0.3, Math.min(0.3, params.sunTilt * sunPull));
+    } else if (params.sun && sunPull > 0) {
       const dx = params.sun.x - bx;
       const dy = params.sun.y - by;
       const dist = Math.hypot(dx, dy) || 1;
@@ -248,7 +251,7 @@
       const near = Math.min(1, 0.3 + 260 / dist);
       // 太阳在树根下方时几乎不产生向光弯曲（光从地下来不合理）
       const above = dy < 0 ? 1 : Math.max(0, 1 - dy / 300);
-      sunTilt = Math.max(-0.38, Math.min(0.38, tilt * sunPull * near * above));
+      sunTilt = Math.max(-0.3, Math.min(0.3, tilt * sunPull * near * above));
     }
 
     const tiltMap = params.tiltMap || {};
@@ -542,12 +545,12 @@
     out.push(`</g>`);
 
     // 背光侧暗边
-    out.push(`<g fill="none" stroke="#0f0a16" stroke-opacity=".62" stroke-linecap="round" transform="translate(${r1(-lx)} ${r1(-ly)})">`);
-    for (const b of branches) out.push(`<path d="${b.d}" stroke-width="${(b.w + (b.depth <= 3 ? 2.4 : 1.4)).toFixed(2)}"/>`);
+    out.push(`<g class="layer-shadow" fill="none" stroke="#0f0a16" stroke-opacity=".62" stroke-linecap="round" transform="translate(${r1(-lx)} ${r1(-ly)})">`);
+    for (const b of branches) out.push(`<path data-path="${b.path}" d="${b.d}" stroke-width="${(b.w + (b.depth <= 3 ? 2.4 : 1.4)).toFixed(2)}"/>`);
     out.push(`</g>`);
 
     // 枝干
-    out.push(`<g fill="none" stroke-linecap="round">`);
+    out.push(`<g class="layer-branch" fill="none" stroke-linecap="round">`);
     for (const b of branches) {
       const cls = b.depth <= 5 ? 'br draw' : 'br';
       const stroke = b.depth >= 3 ? pal.barkB : 'url(#gt-bark)';
@@ -559,10 +562,10 @@
     out.push(`</g>`);
 
     // 受光侧高光（让主干有圆柱感）
-    out.push(`<g fill="none" stroke="#fffdf6" stroke-opacity=".62" stroke-linecap="round" transform="translate(${r1(lx)} ${r1(ly)})">`);
+    out.push(`<g class="layer-hi" fill="none" stroke="#fffdf6" stroke-opacity=".62" stroke-linecap="round" transform="translate(${r1(lx)} ${r1(ly)})">`);
     for (const b of branches) {
       if (b.depth > 3) continue;
-      out.push(`<path d="${b.d}" stroke-width="${(b.w * 0.34).toFixed(2)}"/>`);
+      out.push(`<path data-path="${b.path}" d="${b.d}" stroke-width="${(b.w * 0.34).toFixed(2)}"/>`);
     }
     out.push(`</g>`);
 
@@ -620,20 +623,37 @@
     const built = generate(params, level);
     svg.innerHTML = built.svg;
     if (animate !== false) {
-      const draws = svg.querySelectorAll('path.br.draw');
-      draws.forEach((p) => {
+      // 描边层 + 阴影层 + 高光层一起生长，否则生长过程中会露出黑色剪影
+      const shadowMap = new Map();
+      svg.querySelectorAll('.layer-shadow path').forEach((p) => shadowMap.set(p.dataset.path, p));
+      const hiMap = new Map();
+      svg.querySelectorAll('.layer-hi path').forEach((p) => hiMap.set(p.dataset.path, p));
+
+      const pairs = [];
+      svg.querySelectorAll('path.br.draw').forEach((p) => {
+        const mates = [shadowMap.get(p.dataset.path), hiMap.get(p.dataset.path)].filter(Boolean);
         try {
           const L = p.getTotalLength();
           p.style.strokeDasharray = L;
           p.style.strokeDashoffset = L;
+          mates.forEach((m) => {
+            m.style.strokeDasharray = L;
+            m.style.strokeDashoffset = L;
+          });
         } catch (e) {
           /* ignore */
         }
+        pairs.push({ p, mates });
       });
       requestAnimationFrame(() => {
-        draws.forEach((p, i) => {
-          p.style.transition = `stroke-dashoffset .95s cubic-bezier(.22,.61,.36,1) ${(i * 0.014).toFixed(2)}s`;
+        pairs.forEach(({ p, mates }, i) => {
+          const tr = `stroke-dashoffset .95s cubic-bezier(.22,.61,.36,1) ${(i * 0.014).toFixed(2)}s`;
+          p.style.transition = tr;
           p.style.strokeDashoffset = 0;
+          mates.forEach((m) => {
+            m.style.transition = tr;
+            m.style.strokeDashoffset = 0;
+          });
         });
       });
     }

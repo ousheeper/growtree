@@ -13,3 +13,9 @@ el.log
 state.json
 .DS_Store
 Thumbs.db
+
+# 本地测试存档目录
+.test*/
+
+# 本地测试存档目录
+.test*/

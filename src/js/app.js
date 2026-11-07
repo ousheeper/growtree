@@ -5,6 +5,9 @@
   'use strict';
   const $ = (s) => document.querySelector(s);
 
+  // 冻结倾斜的算法版本：换算法时旧数据不可信，需要整批重算
+  const TILT_VER = 2;
+
   const App = {
     built: null,
     panelOpen: true,
@@ -76,12 +79,14 @@
     renderTree(animate) {
       const svg = document.getElementById('tree');
       const st = Store.state;
-      if (st.tiltSeed !== st.genes.seed) {
+      if (st.tiltSeed !== st.genes.seed || st.tiltVer !== TILT_VER) {
+        // 换种子 / 换了倾斜算法 → 旧的冻结值全部作废
         st.branchTilt = {};
         st.tiltSeed = st.genes.seed;
+        st.tiltVer = TILT_VER;
       }
       const params = Object.assign({}, st.genes, {
-        sun: this.sunSvgPos(),
+        sunTilt: this.sunTiltNow(),
         tiltMap: st.branchTilt || {},
         pruned: st.pruned || [],
         picked: st.picked || []
@@ -162,6 +167,16 @@
 
     prune(path, x, y) {
       if (!path || (Store.state.pruned || []).includes(path)) return;
+      if (path.indexOf('.') < 0) {
+        // 主干剪不得，否则整棵树会消失
+        this.toast('主干不能剪，挑一根枝条试试');
+        return;
+      }
+      if (path.indexOf('.') < 0) {
+        // 主干剪不得，否则整棵树会消失
+        this.toast('主干不能剪，挑一根枝条试试');
+        return;
+      }
       const before = this.built ? this.built.stats.branches : 0;
       Store.state.pruned.push(path);
       if (Store.state.pruned.length > 600) Store.state.pruned.shift();
@@ -170,6 +185,7 @@
       this.renderTree(true);
       const cut = Math.max(1, before - this.built.stats.branches);
       this.sparks(x, y, 12);
+      if (window.Fx) window.Fx.shear(x, y);
       this.toast(`剪掉 ${cut} 根枝条 · 养分 +2`);
       Store.log(`剪去一枝（连带 ${cut} 根），树把养分挪给了别的枝头。`, 'grow');
       this.updateFab();
@@ -180,16 +196,24 @@
       const s = Store.state;
       const counts = {};
       let n = 0;
+      // 先记下位置，重绘后元素就没了
+      const spots = [];
       els.forEach((el) => {
         const id = el.dataset.id;
         const sp = el.dataset.sp;
         if (!id || !sp || s.picked.includes(id)) return;
+        const r = el.getBoundingClientRect();
+        spots.push({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
         s.picked.push(id);
         const cat = window.TreeGen.SPECIES[sp] ? window.TreeGen.SPECIES[sp].cat : null;
         if (cat) counts[cat] = (counts[cat] || 0) + 1;
         n += 1;
       });
       if (!n) return 0;
+      const spark = (this.built && this.built.stats && this.built.stats.glow) || '#ffe3a8';
+      spots.slice(0, 6).forEach((pt, i) => {
+        setTimeout(() => window.Fx && window.Fx.pick(pt.x, pt.y, spark), i * 70);
+      });
       Store.addHarvest(counts);
       s.nutrient += n;
       Store.addXp(n * 3, 'harvest');
@@ -204,19 +228,39 @@
     },
 
     /* ---------- 太阳（独立窗口，可拖到屏幕任意位置） ---------- */
-    sunSvgPos() {
+    /* SVG 画布坐标 → 视口坐标（特效层用；fx 与 getBoundingClientRect 同一坐标系） */
+    svgPt(x, y) {
+      const svg = document.getElementById('tree');
+      if (!svg) return null;
+      const r = svg.getBoundingClientRect();
+      const k = Math.min(r.width / 460, r.height / 800) || 1;
+      return {
+        x: r.left + (r.width - 460 * k) / 2 + x * k,
+        y: r.top + (r.height - 800 * k) + y * k
+      };
+    },
+
+    /* 太阳位置 → 相对竖直方向的倾角（弧度）
+     * 只用窗口矩形做换算，不碰 SVG 坐标系 / zoom / 留白，避免算出反方向。
+     * 返回值的正负：正 = 太阳在右侧，负 = 左侧。强度系数在 tree.js 里乘。
+     */
+    sunTiltNow() {
       const sun = this.sunPos;
       const wb = this.winBounds;
-      const svg = document.getElementById('tree');
-      if (!sun || !wb || !svg) return null;
-      const z = this.scale || 1;
-      const rect = svg.getBoundingClientRect();
-      const px = (sun.x - wb.x) / z - rect.left;
-      const py = (sun.y - wb.y) / z - rect.top;
-      const k = Math.min(rect.width / 460, rect.height / 800) || 1;
-      const offX = (rect.width - 460 * k) / 2;
-      const offY = rect.height - 800 * k;
-      return { x: (px - offX) / k, y: (py - offY) / k };
+      if (!sun || !wb) return null;
+      const treeW = 470;
+      const panelW = this.panelOpen ? 380 : 0;
+      // 树区在窗口里占的宽度比例，树根位于树区水平中点、竖直 85.5% 处
+      const treeCx = 0.5 * (treeW / (treeW + panelW));
+      const groundFy = 0.855;
+      const fx = (sun.x - wb.x) / Math.max(1, wb.width);
+      const fy = (sun.y - wb.y) / Math.max(1, wb.height);
+      const dx = (fx - treeCx) * (wb.width / Math.max(1, wb.height));
+      const dy = fy - groundFy; // <0 = 在树根上方
+      const ang = Math.atan2(dx, -dy); // 相对竖直向上
+      const up = dy < 0 ? 1 : Math.max(0, 1 + dy * 2.6);
+      const tilt = Math.max(-1.35, Math.min(1.35, ang)) * 0.35 * up;
+      return Number(tilt.toFixed(4));
     },
 
     applySun(payload) {
@@ -372,6 +416,11 @@
       if (gain == null) return;
       this.floatText(x, y, '+' + gain);
       this.sparks(x, y, 6);
+      if (window.Fx) {
+        // 水壶锚到盆口（SVG 里 potTop=638），而不是鼠标点
+        const pot = this.svgPt(230, 638);
+        window.Fx.water(pot ? pot.x : x, pot ? pot.y : y);
+      }
       this.updateBar();
       this.renderDock();
       if (Store.state.stats.clicks % 6 === 0) {
@@ -435,6 +484,8 @@
         this.updateBar();
         setTimeout(() => this.renderDock(), 400);
         this.baseBurst(18);
+        const pot = this.svgPt(230, 638);
+        if (window.Fx && pot) window.Fx.levelUp(level, pot.x, pot.y - 24);
         this.toast(unlocked ? `生长周期 ${level} · 收录「${unlocked.name}」` : `生长周期 ${level}`);
         if (Store.state.level % 3 === 1) this.renderDock();
       });
