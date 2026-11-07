@@ -31,7 +31,6 @@
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    /* 只在球体外面加一圈光晕：中间留空，否则会把球的层次压平 */
     background: radial-gradient(
       circle closest-side,
       rgba(255, 212, 140, 0) 0%,
@@ -43,10 +42,11 @@
     );
     animation: pulse 6.5s ease-in-out infinite alternate;
   }
+  /* 尺寸全用百分比：窗口多大，太阳就多大，改大小只要改窗口 */
   .orb {
     position: relative;
-    width: 66px;
-    height: 66px;
+    width: 61%;
+    height: 61%;
     border-radius: 50%;
     background: radial-gradient(
       circle at 50% 44%,
@@ -60,8 +60,8 @@
   }
   .rays {
     position: absolute;
-    width: 104px;
-    height: 104px;
+    width: 96%;
+    height: 96%;
     border-radius: 50%;
     background: repeating-conic-gradient(
       from 0deg,
@@ -84,6 +84,7 @@
 </head>
 <body>
   <div class="wrap">
+    <div class="glow"></div>
     <div class="rays"></div>
     <div class="orb"></div>
   </div>

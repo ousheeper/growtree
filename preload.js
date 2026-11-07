@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('native', {
   setThrough: (on, silent) => ipcRenderer.invoke('win:through', on, !!silent),
   getSun: () => ipcRenderer.invoke('sun:get'),
   setSunTop: (on) => ipcRenderer.invoke('sun:top', on),
+  setSunSize: (px) => ipcRenderer.invoke('sun:size', px),
   placeSun: (x, y) => ipcRenderer.invoke('sun:place', { x, y }),
   onSun: (cb) => ipcRenderer.on('sun', (_e, payload) => cb(payload)),
   onBounds: (cb) => ipcRenderer.on('bounds', (_e, b) => cb(b)),

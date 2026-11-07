@@ -414,7 +414,12 @@
       // 用户拖顶栏挪窗口时也走这条路：把本地矩形同步回来，
       // 否则后面算缩放会拿着旧坐标，一算就歪
       if (payload.win && !this._rzDrag) this.bounds = Object.assign({}, payload.win);
-      Store.state.sun = { x: payload.x, y: payload.y };
+      Store.state.sun = {
+        x: payload.x,
+        y: payload.y,
+        size: payload.size || (Store.state.sun && Store.state.sun.size) || 108
+      };
+      Bus.emit('sun-size', Store.state.sun.size);
       if (payload.fresh) {
         // 首启对齐：之前那一帧是按占位坐标冻结的，作废重算
         Store.state.branchTilt = {};
@@ -435,7 +440,7 @@
         if (p) {
           this.sunPos = { x: p.x, y: p.y };
           this.winBounds = p.win;
-          Store.state.sun = { x: p.x, y: p.y };
+          Store.state.sun = { x: p.x, y: p.y, size: p.size || 108 };
         }
       } catch (e) {
         /* ignore */
@@ -542,6 +547,19 @@
           const hit = !!(el && el.closest('.ui-hit'));
           this.setIgnore(!hit);
         });
+      });
+    },
+
+    /* 改太阳大小（设置里的滑杆调用；滚轮缩放走太阳窗口自己的 preload） */
+    setSunSize(px) {
+      if (!window.native.setSunSize) return;
+      const v = Math.round(Number(px) || 108);
+      window.native.setSunSize(v).then((applied) => {
+        if (typeof applied === 'number' && Store.state.sun) {
+          Store.state.sun.size = applied;
+          Store.saveSoon();
+          Bus.emit('sun-size', applied);
+        }
       });
     },
 

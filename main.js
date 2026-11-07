@@ -358,10 +358,10 @@ function createWindow() {
         const [sx, sy] = String(process.argv[suni + 1]).split(',').map(Number);
         const wa = workArea();
         sunWin.setBounds({
-          x: Math.round(wa.x + wa.width * sx - SUN_SIZE / 2),
-          y: Math.round(wa.y + wa.height * sy - SUN_SIZE / 2),
-          width: SUN_SIZE,
-          height: SUN_SIZE
+          x: Math.round(wa.x + wa.width * sx - sunSize / 2),
+          y: Math.round(wa.y + wa.height * sy - sunSize / 2),
+          width: sunSize,
+          height: sunSize
         });
         await wait(900);
       }
@@ -453,10 +453,10 @@ function createWindow() {
             const [sx, sy] = String(process.argv[suni + 1]).split(',').map(Number);
             const wa = workArea();
             sunWin.setBounds({
-              x: Math.round(wa.x + wa.width * sx - SUN_SIZE / 2),
-              y: Math.round(wa.y + wa.height * sy - SUN_SIZE / 2),
-              width: SUN_SIZE,
-              height: SUN_SIZE
+              x: Math.round(wa.x + wa.width * sx - sunSize / 2),
+              y: Math.round(wa.y + wa.height * sy - sunSize / 2),
+              width: sunSize,
+              height: sunSize
             });
             await new Promise((r) => setTimeout(r, 800));
           }
@@ -522,25 +522,29 @@ function createWindow() {
 }
 
 /* ---------------- 太阳：独立小窗口，可拖到屏幕任意位置 ---------------- */
-const SUN_SIZE = 108; // 窗口要留出光晕的余量，等于球体直径的话边框会被硬切
+const SUN_SIZE_DEF = 108; // 窗口要留出光晕的余量，等于球体直径的话边框会被硬切
+const SUN_SIZE_MIN = 64;
+const SUN_SIZE_MAX = 240;
+let sunSize = SUN_SIZE_DEF;
 
 function createSunWindow() {
   const saved = (readState() && readState().sun) || {};
+  sunSize = clamp(Math.round(Number(saved.size) || SUN_SIZE_DEF), SUN_SIZE_MIN, SUN_SIZE_MAX);
   const wa = workArea();
   // 首次启动：把太阳放在树冠正上方（而不是屏幕 24% 处——那会让树永远往左倒）
   const tb = win && !win.isDestroyed() ? win.getBounds() : null;
   const treeW = tb ? STAGE_W * geom.z : STAGE_W;
   const defX = tb ? tb.x + treeW / 2 : wa.x + wa.width * 0.5;
-  const defY = tb ? Math.max(wa.y + SUN_SIZE / 2 + 6, tb.y + 34) : wa.y + wa.height * 0.14;
+  const defY = tb ? Math.max(wa.y + sunSize / 2 + 6, tb.y + 34) : wa.y + wa.height * 0.14;
   const cx = typeof saved.x === 'number' ? saved.x : defX;
   const cy = typeof saved.y === 'number' ? saved.y : defY;
-  const half = SUN_SIZE / 2;
+  const half = sunSize / 2;
   const x = Math.round(Math.min(Math.max(cx - half, wa.x - half), wa.x + wa.width - half));
   const y = Math.round(Math.min(Math.max(cy - half, wa.y - half), wa.y + wa.height - half));
 
   sunWin = new BrowserWindow({
-    width: SUN_SIZE,
-    height: SUN_SIZE,
+    width: sunSize,
+    height: sunSize,
     x,
     y,
     frame: false,
@@ -555,7 +559,12 @@ function createSunWindow() {
     alwaysOnTop: true,
     show: false,
     title: '太阳',
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: false }
+    webPreferences: {
+      preload: path.join(ROOT, 'src', 'sun-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
   });
   sunWin.loadFile(path.join(ROOT, 'src', 'sun.html'));
 
@@ -565,6 +574,8 @@ function createSunWindow() {
     sunWin.webContents.once('did-finish-load', () => {
       setTimeout(async () => {
         try {
+          const api = await sunWin.webContents.executeJavaScript('typeof window.sunApi');
+          console.log('[suncap] sunApi =', api, 'size =', sunWin.getBounds().width);
           const img = await sunWin.webContents.capturePage();
           fs.writeFileSync(out, img.toPNG());
           console.log('[suncap] saved to', out);
@@ -596,14 +607,14 @@ function alignSunOverTree() {
   const wa = workArea();
   const tb = win.getBounds();
   const treeW = STAGE_W * geom.z;
-  const half = SUN_SIZE / 2;
+  const half = sunSize / 2;
   const cx = tb.x + treeW / 2;
   const cy = Math.max(wa.y + half + 6, tb.y + 30);
   sunWin.setBounds({
     x: Math.round(Math.min(Math.max(cx - half, wa.x - half), wa.x + wa.width - half)),
     y: Math.round(Math.min(Math.max(cy - half, wa.y - half), wa.y + wa.height - half)),
-    width: SUN_SIZE,
-    height: SUN_SIZE
+    width: sunSize,
+    height: sunSize
   });
   sunAligned = true;
   broadcastSun({ fresh: true });
@@ -619,6 +630,7 @@ function broadcastSun(extra) {
       {
         x: sb.x + sb.width / 2,
         y: sb.y + sb.height / 2,
+        size: sunSize,
         win: win.getBounds()
       },
       extra || {}
@@ -649,8 +661,31 @@ function broadcastBoundsSoon() {
 ipcMain.handle('sun:get', () => {
   if (!sunWin || sunWin.isDestroyed() || !win || !sunAligned) return null;
   const sb = sunWin.getBounds();
-  return { x: sb.x + sb.width / 2, y: sb.y + sb.height / 2, win: win.getBounds() };
+  return { x: sb.x + sb.width / 2, y: sb.y + sb.height / 2, size: sunSize, win: win.getBounds() };
 });
+
+/* 改太阳大小：以圆心为锚，滚轮和设置里的滑杆都走这里 */
+function setSunSize(px) {
+  if (!sunWin || sunWin.isDestroyed()) return sunSize;
+  const size = clamp(Math.round(Number(px) || sunSize), SUN_SIZE_MIN, SUN_SIZE_MAX);
+  const b = sunWin.getBounds();
+  const cx = b.x + b.width / 2;
+  const cy = b.y + b.height / 2;
+  const wa = workArea();
+  const half = size / 2;
+  sunSize = size;
+  sunWin.setBounds({
+    x: Math.round(clamp(cx - half, wa.x - half, wa.x + wa.width - half)),
+    y: Math.round(clamp(cy - half, wa.y - half, wa.y + wa.height - half)),
+    width: size,
+    height: size
+  });
+  broadcastSunSoon();
+  return size;
+}
+
+ipcMain.handle('sun:size', (_e, px) => setSunSize(px));
+ipcMain.handle('sun:size:get', () => sunSize);
 
 ipcMain.handle('sun:top', (_e, on) => {
   if (sunWin && !sunWin.isDestroyed()) sunWin.setAlwaysOnTop(!!on, 'floating');
@@ -707,12 +742,12 @@ ipcMain.handle('win:geom', () => ({
 ipcMain.handle('sun:place', (_e, p) => {
   if (!sunWin || sunWin.isDestroyed() || !p) return false;
   const wa = workArea();
-  const half = SUN_SIZE / 2;
+  const half = sunSize / 2;
   sunWin.setBounds({
     x: Math.round(clamp(p.x - half, wa.x - half, wa.x + wa.width - half)),
     y: Math.round(clamp(p.y - half, wa.y - half, wa.y + wa.height - half)),
-    width: SUN_SIZE,
-    height: SUN_SIZE
+    width: sunSize,
+    height: sunSize
   });
   sunAligned = true;
   broadcastSun({ fresh: true });
