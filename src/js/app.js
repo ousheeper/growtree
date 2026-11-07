@@ -57,6 +57,7 @@
       await this.initSun();
       this.setMode(ui.mode || 'water');
       this.renderTree(false);
+      this.alignSunToTree();
       this.updateBar();
       this.startLoop();
 
@@ -132,7 +133,7 @@
           sunTilt: this.sunTiltNow(),
           tiltMap: st.branchTilt || {},
           pruned: st.pruned || [],
-          picked: st.picked || []
+          picked: Store.freshPicked()
         },
         extra || {}
       );
@@ -335,6 +336,7 @@
     harvestEls(els) {
       const s = Store.state;
       const counts = {};
+      const pickedIds = [];
       let n = 0;
       // 先记下位置，重绘后元素就没了
       const spots = [];
@@ -345,11 +347,13 @@
         const r = el.getBoundingClientRect();
         spots.push({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
         s.picked.push(id);
+        pickedIds.push(id);
         const cat = window.TreeGen.SPECIES[sp] ? window.TreeGen.SPECIES[sp].cat : null;
         if (cat) counts[cat] = (counts[cat] || 0) + 1;
         n += 1;
       });
       if (!n) return 0;
+      Store.markPicked(pickedIds);
       const spark = (this.built && this.built.stats && this.built.stats.glow) || '#ffe3a8';
       spots.slice(0, 6).forEach((pt, i) => {
         setTimeout(() => window.Fx && window.Fx.pick(pt.x, pt.y, spark), i * 70);
@@ -553,6 +557,7 @@
         if (g) {
           this.bounds = g.bounds;
           this.workArea = g.workArea;
+          this.firstRun = !!g.firstRun;
         }
       } catch (e) {
         /* ignore */
@@ -625,6 +630,28 @@
     syncZoomLabel() {
       const zl = document.getElementById('zoomVal');
       if (zl) zl.textContent = Math.round(this.z * 100) + '%';
+    },
+
+    /* 老存档没记过窗口位置：树现在的位置是重新摆的，太阳也得跟着挪到树冠上方，
+     * 否则它会卡在树中间（太阳是独立窗口，画在树的上面）。 */
+    alignSunToTree() {
+      if (!this.firstRun || !this.sunPos || !window.native.placeSun) return;
+      this.firstRun = false;
+      const svg = document.getElementById('tree');
+      const root = document.querySelector('#tree .layer-branch'); // 枝干层，比整棵（含浮游孢子）更贴近树冠
+      if (!svg || !root || !root.getBBox) return;
+      let bb;
+      try {
+        bb = root.getBBox();
+      } catch (e) {
+        return;
+      }
+      if (!bb || !bb.height) return;
+      const r = svg.getBoundingClientRect();
+      const k = Math.min(r.width / 460, r.height / 800) || 1;
+      // viewBox y=800 对齐元素底边，树冠顶部就是 bbox.y
+      const crownY = Math.round(screenY + r.bottom - (800 - bb.y) * k);
+      window.native.placeSun(this.sunPos.x, crownY - 62);
     },
 
     /* 缩放：以树根（树区底边中点）为锚点，脚下的土不动，只是整体变大变小 */
@@ -867,6 +894,7 @@
 
       Store.on('levelup', ({ level, unlocked }) => {
         Store.state.picked = [];
+        Store.state.pickedAt = {};
         this.renderTree(true);
         this.updateFab();
         Store.addHarvest(this.built && this.built.stats ? this.built.stats.species : null);
@@ -926,6 +954,7 @@
 
     startLoop() {
       let last = performance.now();
+      let sec = 0;
       setInterval(() => {
         const now = performance.now();
         const dt = now - last;
@@ -934,6 +963,11 @@
         Store.tick(dt);
         this.updateBar();
         this.updateSoil();
+        // 摘掉的花果到时间了会长回来，隔 45 秒查一次，有变化才重绘
+        if (++sec % 45 === 0 && Store.state.picked.length) {
+          const before = Store.state.picked.length;
+          if (Store.freshPicked().length < before) this.renderTree(true);
+        }
       }, 1000);
       setInterval(() => Store.save(), 30000);
     },

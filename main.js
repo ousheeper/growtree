@@ -59,6 +59,7 @@ function readGeom(saved) {
 let win = null;
 let sunWin = null;
 let sunAligned = false;
+let firstRun = false; // 老存档没记过窗口位置：这次启动要把太阳重新摆到树冠上方
 
 /* ---------------- 键盘敲击统计 ---------------- */
 let keyWatcher = null;
@@ -276,6 +277,7 @@ function createWindow() {
 
   const size = geomSize(g);
   const sb = ui.bounds;
+  firstRun = !(sb && typeof sb.x === 'number');
   let x;
   let y;
   if (sb && typeof sb.x === 'number') {
@@ -286,15 +288,6 @@ function createWindow() {
   } else {
     x = wa.x + wa.width - size.width - EDGE_GAP;
     y = wa.y + 24;
-    // 老存档没记过窗口位置：拿太阳当参照物。太阳一般就停在树冠上方，
-    // 这样升级后树不会突然窜到屏幕顶上、把太阳塞进树冠里。
-    const sun = saved && saved.sun;
-    if (sun && typeof sun.y === 'number') {
-      const treeCx = x + (STAGE_W * g.z) / 2;
-      if (Math.abs(sun.x - treeCx) < 260 * g.z) {
-        y = clamp(Math.round(sun.y - 30), wa.y + 8, wa.y + wa.height - size.height - 8);
-      }
-    }
   }
   x = Math.round(clamp(x, wa.x - size.width + 120, wa.x + wa.width - 120));
   y = Math.round(clamp(y, wa.y - 40, wa.y + wa.height - 160));
@@ -529,7 +522,7 @@ function createWindow() {
 }
 
 /* ---------------- 太阳：独立小窗口，可拖到屏幕任意位置 ---------------- */
-const SUN_SIZE = 76;
+const SUN_SIZE = 108; // 窗口要留出光晕的余量，等于球体直径的话边框会被硬切
 
 function createSunWindow() {
   const saved = (readState() && readState().sun) || {};
@@ -565,6 +558,24 @@ function createSunWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: false }
   });
   sunWin.loadFile(path.join(ROOT, 'src', 'sun.html'));
+
+  // 调试：把太阳窗口单独截出来（透明底），检查光晕有没有被窗口边界切到
+  if (process.argv.includes('--suncap')) {
+    const out = process.argv[process.argv.indexOf('--suncap') + 1] || path.join(ROOT, 'sun.png');
+    sunWin.webContents.once('did-finish-load', () => {
+      setTimeout(async () => {
+        try {
+          const img = await sunWin.webContents.capturePage();
+          fs.writeFileSync(out, img.toPNG());
+          console.log('[suncap] saved to', out);
+        } catch (e) {
+          console.error('[suncap] failed', e);
+        }
+        quitting = true;
+        app.quit();
+      }, 1200);
+    });
+  }
   // 首启：等主窗口定位完成后再把太阳摆到树冠正上方（创建瞬间的 bounds 还不可靠）
   sunAligned = typeof saved.x === 'number';
   if (!sunAligned) {
@@ -688,8 +699,26 @@ ipcMain.handle('state:save', (_e, data) => {
 ipcMain.handle('win:geom', () => ({
   bounds: win && !win.isDestroyed() ? win.getBounds() : null,
   workArea: workArea(),
+  firstRun,
   geom: Object.assign({}, geom)
 }));
+
+/* 渲染进程量出树冠顶部后，把太阳摆到它上面（只在新装/老存档没位置时做一次） */
+ipcMain.handle('sun:place', (_e, p) => {
+  if (!sunWin || sunWin.isDestroyed() || !p) return false;
+  const wa = workArea();
+  const half = SUN_SIZE / 2;
+  sunWin.setBounds({
+    x: Math.round(clamp(p.x - half, wa.x - half, wa.x + wa.width - half)),
+    y: Math.round(clamp(p.y - half, wa.y - half, wa.y + wa.height - half)),
+    width: SUN_SIZE,
+    height: SUN_SIZE
+  });
+  sunAligned = true;
+  broadcastSun({ fresh: true });
+  firstRun = false;
+  return true;
+});
 
 /* 渲染进程算好目标矩形，这里只负责落位 + 兜底夹取 */
 ipcMain.handle('win:bounds', (_e, b) => {

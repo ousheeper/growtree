@@ -492,7 +492,8 @@
       // 至少保证一颗垂枝，否则低等级时可能一颗都看不到
       const inLow = t.y > lowHalfY && t.y < GROUND - 70;
       const inX = t.x > 26 && t.x < W - 26; // 太靠边的会被画布裁掉
-      const forceHang = hangCount === 0 && hangChance > 0 && t.y < GROUND - 90 && inX;
+      // 至少保证两颗垂枝（低等级、枝头少的时候也能看见），否则全挂在枝头看不出「垂」的效果
+      const forceHang = hangCount < 2 && hangChance > 0 && t.y < GROUND - 90 && inX;
       const canHang = hangChance > 0 && inX && t.y < GROUND - 70 && ((hangRoll < hangChance && inLow) || forceHang);
       if (canHang) hangCount += 1;
       const hangLen = canHang ? 22 + SR() * 20 : 0;

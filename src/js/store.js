@@ -25,6 +25,8 @@
   // 键盘：每 40 键 +1 生长值，每 200 键 +1 养分
   const KEY_XP_EVERY = 40;
   const KEY_NUT_EVERY = 200;
+  // 摘掉的花果不是永远没了：隔一段时间会在同样的枝头重新长出来
+  const REGROW_MS = 7 * 60 * 1000;
   const CLICK_XP = 4;
   const CLICK_CD = 650;
 
@@ -67,6 +69,7 @@
         sun: null,
         pruned: [],
         picked: [],
+        pickedAt: {},
         branchTilt: {},
         tiltSeed: null,
         lastSeen: Date.now(),
@@ -95,6 +98,7 @@
       // 自愈：主干（'r' 或不含层级的路径）不能剪，历史存档里若有就丢掉，否则整棵树是空的
       s.pruned = s.pruned.filter((x) => typeof x === 'string' && x.indexOf('.') > 0);
       if (!Array.isArray(s.picked)) s.picked = [];
+      if (!s.pickedAt || typeof s.pickedAt !== 'object') s.pickedAt = {};
       if (typeof s.soil !== 'number') s.soil = 62;
       // 键盘统计按天重置
       const today = new Date().toDateString();
@@ -251,6 +255,38 @@
       this.log(`图鉴解锁：${pick.name}（${window.CODEX_RARITY[pick.rarity]}）—— ${pick.desc}`, 'codex');
       emit('codex', pick);
       return pick;
+    },
+
+    /* 还没到「重新长出来」时间的枝头：这些才需要盖住不画
+     * 老存档里 picked 没有时间戳，当作早就该长了，直接放出来（否则剪过头的树会一直是光的） */
+    freshPicked() {
+      const s = this.state;
+      if (!s) return [];
+      const at = s.pickedAt || (s.pickedAt = {});
+      const now = Date.now();
+      const keep = [];
+      let changed = false;
+      for (const id of s.picked || []) {
+        if (at[id] && now - at[id] < REGROW_MS) keep.push(id);
+        else {
+          delete at[id];
+          changed = true;
+        }
+      }
+      if (changed || keep.length !== (s.picked || []).length) {
+        s.picked = keep;
+        this.saveSoon();
+      }
+      return keep;
+    },
+
+    /* 刚摘下来的枝头：记时间，到点自己长回来 */
+    markPicked(ids) {
+      const s = this.state;
+      if (!s || !ids || !ids.length) return;
+      const at = s.pickedAt || (s.pickedAt = {});
+      const now = Date.now();
+      for (const id of ids) at[id] = now;
     },
 
     log(text, kind) {
