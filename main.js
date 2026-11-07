@@ -28,6 +28,7 @@ const EDGE_GAP = 14;
 
 let win = null;
 let sunWin = null;
+let sunAligned = false; // 首启时太阳还没摆到树冠上方，此时不要给渲染进程报坐标
 let tray = null;
 let quitting = false;
 let passThrough = false;
@@ -467,7 +468,8 @@ function createSunWindow() {
   });
   sunWin.loadFile(path.join(ROOT, 'src', 'sun.html'));
   // 首启：等主窗口定位完成后再把太阳摆到树冠正上方（创建瞬间的 bounds 还不可靠）
-  if (typeof saved.x !== 'number') {
+  sunAligned = typeof saved.x === 'number';
+  if (!sunAligned) {
     sunWin.once('ready-to-show', () => setTimeout(alignSunOverTree, 500));
   }
   sunWin.setAlwaysOnTop(true, 'floating');
@@ -496,21 +498,29 @@ function alignSunOverTree() {
     width: SUN_SIZE,
     height: SUN_SIZE
   });
-  broadcastSun();
+  sunAligned = true;
+  broadcastSun({ fresh: true });
 }
 
-function broadcastSun() {  if (!win || win.isDestroyed()) return;
+function broadcastSun(extra) {
+  if (!win || win.isDestroyed()) return;
   if (!sunWin || sunWin.isDestroyed()) return;
   const sb = sunWin.getBounds();
-  win.webContents.send('sun', {
-    x: sb.x + sb.width / 2,
-    y: sb.y + sb.height / 2,
-    win: win.getBounds()
-  });
+  win.webContents.send(
+    'sun',
+    Object.assign(
+      {
+        x: sb.x + sb.width / 2,
+        y: sb.y + sb.height / 2,
+        win: win.getBounds()
+      },
+      extra || {}
+    )
+  );
 }
 
 ipcMain.handle('sun:get', () => {
-  if (!sunWin || sunWin.isDestroyed() || !win) return null;
+  if (!sunWin || sunWin.isDestroyed() || !win || !sunAligned) return null;
   const sb = sunWin.getBounds();
   return { x: sb.x + sb.width / 2, y: sb.y + sb.height / 2, win: win.getBounds() };
 });

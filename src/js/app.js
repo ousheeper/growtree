@@ -268,15 +268,21 @@
       this.sunPos = { x: payload.x, y: payload.y };
       this.winBounds = payload.win;
       Store.state.sun = { x: payload.x, y: payload.y };
+      if (payload.fresh) {
+        // 首启对齐：之前那一帧是按占位坐标冻结的，作废重算
+        Store.state.branchTilt = {};
+      }
       Store.saveSoon(1500);
       // 形状不重算（枝干冻结），只让光照跟过去；整体重绘一次即可刷新明暗
       const now = performance.now();
-      if (now - (this._sunRender || 0) < 120) return;
+      const force = !!payload.fresh; // 首启对齐必须立刻重画，不能被节流吞掉
+      if (!force && now - (this._sunRender || 0) < 120) return;
       this._sunRender = now;
       this.renderTree(false);
     },
 
     async initSun() {
+      window.native.onSun((payload) => this.applySun(payload));
       try {
         const p = await window.native.getSun();
         if (p) {
@@ -287,7 +293,20 @@
       } catch (e) {
         /* ignore */
       }
-      window.native.onSun((payload) => this.applySun(payload));
+      if (!this.sunPos) {
+        // 首次启动：主进程要等主窗口定位完成后才把太阳摆到树冠上方。
+        // 这里等它一下，否则第一帧会按错误位置冻结倾角。
+        await new Promise((res) => {
+          const t = setTimeout(res, 900);
+          const iv = setInterval(() => {
+            if (this.sunPos) {
+              clearInterval(iv);
+              clearTimeout(t);
+              res();
+            }
+          }, 60);
+        });
+      }
     },
 
     /* ---------- 交互 ---------- */
