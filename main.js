@@ -286,6 +286,15 @@ function createWindow() {
   } else {
     x = wa.x + wa.width - size.width - EDGE_GAP;
     y = wa.y + 24;
+    // 老存档没记过窗口位置：拿太阳当参照物。太阳一般就停在树冠上方，
+    // 这样升级后树不会突然窜到屏幕顶上、把太阳塞进树冠里。
+    const sun = saved && saved.sun;
+    if (sun && typeof sun.y === 'number') {
+      const treeCx = x + (STAGE_W * g.z) / 2;
+      if (Math.abs(sun.x - treeCx) < 260 * g.z) {
+        y = clamp(Math.round(sun.y - 30), wa.y + 8, wa.y + wa.height - size.height - 8);
+      }
+    }
   }
   x = Math.round(clamp(x, wa.x - size.width + 120, wa.x + wa.width - 120));
   y = Math.round(clamp(y, wa.y - 40, wa.y + wa.height - 160));
