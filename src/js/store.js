@@ -92,6 +92,8 @@
       if (!Array.isArray(s.codex)) s.codex = [];
       if (!Array.isArray(s.journal)) s.journal = [];
       if (!Array.isArray(s.pruned)) s.pruned = [];
+      // 自愈：主干（'r' 或不含层级的路径）不能剪，历史存档里若有就丢掉，否则整棵树是空的
+      s.pruned = s.pruned.filter((x) => typeof x === 'string' && x.indexOf('.') > 0);
       if (!Array.isArray(s.picked)) s.picked = [];
       if (typeof s.soil !== 'number') s.soil = 62;
       // 键盘统计按天重置
