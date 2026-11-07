@@ -223,12 +223,29 @@
     const rndOf = (k) => mulberry32(hash32(params.seed + '|' + k));
 
     const lv = Math.max(1, level | 0);
-    const maxDepth = Math.min(6, 5 + Math.floor(lv / 6));
+
+    /* ---------- 生长阶段：种子 → 幼苗 → 小树 → 成树 ---------- */
+    const STAGE_DEF = [
+      { key: 'seed', minLv: 1, depth: 1, trunkK: 0.38, forks: 2, wK: 0.5, label: '种子' },
+      { key: 'sprout', minLv: 2, depth: 2, trunkK: 0.52, forks: 2, wK: 0.62, label: '幼苗' },
+      { key: 'sapling', minLv: 4, depth: 3, trunkK: 0.74, forks: 3, wK: 0.82, label: '小树' },
+      { key: 'tree', minLv: 7, depth: 0, trunkK: 1, forks: 3, wK: 1, label: '成树' }
+    ];
+    let stage = STAGE_DEF[0];
+    for (const st of STAGE_DEF) if (lv >= st.minLv) stage = st;
+    const isSeed = stage.key === 'seed';
+
+    const maxDepth = stage.depth || Math.max(4, Math.min(6, 4 + Math.floor((lv - 7) / 3)));
     // 10 级后，少数枝头会再冒一层新枝（长期生长）
-    const extendChance = Math.max(0, Math.min(0.4, (lv - 9) / 45));
+    const extendChance = stage.depth ? 0 : Math.max(0, Math.min(0.4, (lv - 9) / 45));
     const forkStart = 1;
-    const trunkLen = 44 + params.height * 30 + Math.min(9, lv * 0.8);
-    const trunkW = 12 + params.height * 10;
+    const firstFork = stage.forks;
+    // 早期阶段没有分层可加，用"每级长高"来体现生长
+    const lvlBonus = stage.depth
+      ? (lv - stage.minLv) * (stage.key === 'seed' ? 0 : stage.key === 'sprout' ? 16 : 18)
+      : Math.min(9, lv * 0.8);
+    const trunkLen = (44 + params.height * 30) * stage.trunkK + lvlBonus;
+    const trunkW = (12 + params.height * 10) * stage.wK;
 
     const branches = [];
     const tips = [];
@@ -300,7 +317,7 @@
         return;
       }
 
-      const n = d === forkStart ? 3 : R() < 0.22 ? 2 : Math.max(2, Math.min(4, params.branches));
+      const n = d === forkStart ? firstFork : R() < 0.22 ? 2 : Math.max(2, Math.min(4, params.branches));
       for (let i = 0; i < n; i++) {
         const t = n === 1 ? 0 : (i / (n - 1) - 0.5) * 2;
         let na = ang + t * params.spread * (0.8 + R() * 0.6) + (R() - 0.5) * params.irregular * 0.85;
@@ -321,12 +338,13 @@
     // 根须
     const roots = [];
     const RR = rndOf('roots');
-    for (let i = 0; i < 7; i++) {
+    const rootK = stage.key === 'seed' ? 0 : stage.key === 'sprout' ? 0.45 : stage.key === 'sapling' ? 0.75 : 1;
+    for (let i = 0; i < 7 && rootK > 0; i++) {
       const t = i / 6 - 0.5;
-      const ex = bx + t * (78 + RR() * 36);
+      const ex = bx + t * (78 + RR() * 36) * rootK;
       const ey = by + 12 + Math.abs(t) * 10 + RR() * 8;
       roots.push({
-        d: `M${r1(bx + t * 14)},${r1(by)} Q${r1(bx + t * 48)},${r1(by + 16 + RR() * 10)} ${r1(ex)},${r1(ey)}`,
+        d: `M${r1(bx + t * 14 * rootK)},${r1(by)} Q${r1(bx + t * 48 * rootK)},${r1(by + (16 + RR() * 10) * rootK)} ${r1(ex)},${r1(ey)}`,
         w: 3.2 - Math.abs(t) * 2.2
       });
     }
@@ -363,6 +381,21 @@
       addLeaves(t, R, n - nb, false);
     }
 
+    // 种子阶段：顶端两片子叶，像刚破土的芽
+    if (isSeed && tips.length) {
+      const t = tips[0];
+      for (let i = 0; i < 2; i++) {
+        frontLeaves.push({
+          x: t.x + (i ? 8 : -8),
+          y: t.y - 4 - i * 1.5,
+          rot: i ? 34 : -34,
+          sc: 1.45,
+          c: leafColors[i % leafColors.length],
+          delay: (i * 0.5).toFixed(2)
+        });
+      }
+    }
+
     // 枝干中段（只在前层，避免背面太乱）
     for (const b of branches) {
       if (b.depth < maxDepth - 3) continue;
@@ -387,7 +420,8 @@
     const frontPicked = trim(frontLeaves, 400);
 
     /* ---------- 挂果 ---------- */
-    const allowed = Object.keys(SPECIES).filter((k) => speciesCfg[SPECIES[k].cat] !== false && lv >= SPECIES[k].minLevel);
+    // 种子和幼苗不挂果：刚破土就开花不符合常理
+    const allowed = lv < 4 ? [] : Object.keys(SPECIES).filter((k) => speciesCfg[SPECIES[k].cat] !== false && lv >= SPECIES[k].minLevel);
     const catCount = { flower: 0, fruit: 0, mushroom: 0, crystal: 0 };
     const decos = [];
     const maxTotal = Math.round((6 + Math.min(17, lv * 1.45)) * (0.45 + params.decoRate));
@@ -545,7 +579,8 @@
       const rx = bx + i * 15;
       runes += `<path d="M${rx} ${potTop + 3} l3 6 l-6 0 z" fill="${pal.heart}" opacity=".34"/>`;
     }
-    out.push(`<g class="pot">
+    const potK = stage.key === 'seed' ? 0.52 : stage.key === 'sprout' ? 0.68 : stage.key === 'sapling' ? 0.86 : 1;
+    out.push(`<g class="pot" transform="translate(${bx} ${potTop}) scale(${potK}) translate(${-bx} ${-potTop})">
       <ellipse cx="${bx}" cy="${potTop + 18}" rx="72" ry="18" fill="#08060d" opacity=".8"/>
       <path d="M${bx - 58} ${potTop} C ${bx - 47} ${potTop + 68}, ${bx + 47} ${potTop + 68}, ${bx + 58} ${potTop} Z"
             fill="url(#gt-pot)" stroke="rgba(0,0,0,.5)" stroke-width="1.2"/>
@@ -639,6 +674,8 @@
         palette: pal.name,
         glow: pal.glow,
         maxDepth,
+        stage: stage.key,
+        stageLabel: stage.label,
         sunTilt: Number((sunTilt * 57.3).toFixed(1)),
         newTilt
       }

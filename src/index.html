@@ -34,7 +34,7 @@
     <div class="base ui-hit" id="base">
       <div class="slots" id="slots"></div>
       <div class="levelbar">
-        <div class="lv">LV <b id="lvNum">1</b></div>
+        <div class="lv">LV <b id="lvNum">1</b><span class="stagetag" id="stageName">种子</span></div>
         <div class="bar"><i id="xpFill"></i></div>
         <div class="pct" id="pct">0%</div>
       </div>
@@ -49,6 +49,17 @@
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <div class="ask ui-hit" id="ask">
+      <div class="ask-card">
+        <h4 id="askTitle">确认</h4>
+        <p id="askText"></p>
+        <div class="ask-btns">
+          <button class="btn ghost" id="askCancel">取消</button>
+          <button class="btn danger" id="askOk">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <aside class="panel ui-hit" id="panel">

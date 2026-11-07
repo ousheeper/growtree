@@ -89,10 +89,14 @@
         ctx.toast('枝条重新长回来了');
       };
 
-      root.querySelector('#stReset').onclick = () => {
-        if (confirm('清空这棵树的所有记录？生长值、图鉴、手记都会消失，且无法恢复。')) {
-          Store.resetAll();
-        }
+      root.querySelector('#stReset').onclick = async () => {
+        const ok = await ctx.ask({
+          title: '重置全部数据？',
+          text: '生长值、等级、图鉴、手记、剪枝记录全部清空，树会从种子重新开始。这个操作无法撤销。',
+          ok: '清空重来',
+          cancel: '取消'
+        });
+        if (ok) Store.resetAll();
       };
 
       render();

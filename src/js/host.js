@@ -81,6 +81,7 @@
         refreshTree: (animate) => Bus.emit('refresh-tree', animate !== false),
         burst: (n) => Bus.emit('burst', n || 8),
         toast: (text) => Bus.emit('toast', text),
+        ask: (opts) => (window.__app ? window.__app.askConfirm(opts) : Promise.resolve(false)),
         on: (evt, fn) => Bus.on(evt, fn),
         scale: (v) => window.__app && window.__app.applyScale(v, true),
         plugins: () => this.all(),

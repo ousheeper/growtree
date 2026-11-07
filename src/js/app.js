@@ -9,6 +9,11 @@
   // 冻结倾斜的算法版本：换算法时旧数据不可信，需要整批重算
   const TILT_VER = 2;
 
+  // 修剪保护：剪完至少留这么多枝；单刀最多剪掉这么多比例；超过这个比例先确认
+  const MIN_KEEP_BRANCHES = 4;
+  const MAX_CUT_RATIO = 0.5;
+  const ASK_CUT_RATIO = 0.12;
+
   const App = {
     built: null,
     panelOpen: true,
@@ -98,6 +103,35 @@
       if (res && res.nut > 0) this.toast('敲击 ' + (Store.state.stats.keysToday || 0) + ' 下 · 养分 +' + res.nut);
     },
 
+    buildParams(extra) {
+      const st = Store.state;
+      return Object.assign(
+        {},
+        st.genes,
+        {
+          sunTilt: this.sunTiltNow(),
+          tiltMap: st.branchTilt || {},
+          pruned: st.pruned || [],
+          picked: st.picked || []
+        },
+        extra || {}
+      );
+    },
+
+    /* 不落地地试算一次：剪掉这根会少多少枝 */
+    analyzeCut(path) {
+      const before = this.built ? this.built.stats.branches : 0;
+      const pruned = (Store.state.pruned || []).concat([path]);
+      let after = before;
+      try {
+        after = window.TreeGen.generate(this.buildParams({ pruned }), Store.state.level).stats.branches;
+      } catch (e) {
+        /* ignore */
+      }
+      const cut = Math.max(0, before - after);
+      return { before, after, cut, ratio: cut / Math.max(1, before) };
+    },
+
     renderTree(animate) {
       const svg = document.getElementById('tree');
       const st = Store.state;
@@ -107,12 +141,7 @@
         st.tiltSeed = st.genes.seed;
         st.tiltVer = TILT_VER;
       }
-      const params = Object.assign({}, st.genes, {
-        sunTilt: this.sunTiltNow(),
-        tiltMap: st.branchTilt || {},
-        pruned: st.pruned || [],
-        picked: st.picked || []
-      });
+      const params = this.buildParams();
       this.built = window.TreeGen.mount(svg, params, Store.state.level, animate !== false);
       // 记录新枝出生时的太阳方位；之后太阳再动，这些枝也不变
       if (this.built.stats.newTilt) {
@@ -163,6 +192,8 @@
       const s = Store.state;
       if (!s) return;
       $('#lvNum').textContent = s.level;
+      const sn = document.getElementById('stageName');
+      if (sn && this.built && this.built.stats.stageLabel) sn.textContent = this.built.stats.stageLabel;
       const p = Store.xpPercent;
       $('#xpFill').style.width = p.toFixed(1) + '%';
       $('#pct').textContent = Math.floor(p) + '%';
@@ -189,31 +220,86 @@
       fab.style.opacity = n ? '1' : '0.45';
     },
 
-    prune(path, x, y) {
+    async prune(path, x, y) {
       if (!path || (Store.state.pruned || []).includes(path)) return;
       if (path.indexOf('.') < 0) {
         // 主干剪不得，否则整棵树会消失
         this.toast('主干不能剪，挑一根枝条试试');
         return;
       }
-      if (path.indexOf('.') < 0) {
-        // 主干剪不得，否则整棵树会消失
-        this.toast('主干不能剪，挑一根枝条试试');
+
+      // 先试算，别把树剪死
+      const info = this.analyzeCut(path);
+      if (info.after < MIN_KEEP_BRANCHES) {
+        this.toast(`再剪就只剩 ${info.after} 根枝，这棵树活不成了`);
         return;
       }
-      const before = this.built ? this.built.stats.branches : 0;
+      if (info.ratio > MAX_CUT_RATIO) {
+        this.toast(`这一刀要带走 ${Math.round(info.ratio * 100)}% 的枝，太多了`);
+        return;
+      }
+      if (info.ratio >= ASK_CUT_RATIO) {
+        const ok = await this.askConfirm({
+          title: '要剪掉这一大枝？',
+          text: `会带走 ${info.cut} 根枝条（占全树 ${Math.round(info.ratio * 100)}%），剪完还剩 ${info.after} 根。剪口不会长回来。`,
+          ok: '剪掉',
+          cancel: '算了'
+        });
+        if (!ok) return;
+      }
+
       Store.state.pruned.push(path);
-      if (Store.state.pruned.length > 600) Store.state.pruned.shift();
-      Store.state.nutrient += 2;
+      if (Store.state.pruned.length > 2000) Store.state.pruned.shift();
+      // 剪得越狠，单次养分越少
+      const reward = info.ratio > 0.25 ? 1 : 2;
+      Store.state.nutrient += reward;
       Store.addXp(3, 'prune');
       this.renderTree(true);
-      const cut = Math.max(1, before - this.built.stats.branches);
       this.sparks(x, y, 12);
       if (window.Fx) window.Fx.shear(x, y);
-      this.toast(`剪掉 ${cut} 根枝条 · 养分 +2`);
-      Store.log(`剪去一枝（连带 ${cut} 根），树把养分挪给了别的枝头。`, 'grow');
+      this.toast(`剪掉 ${info.cut} 根枝条 · 养分 +${reward}`);
+      Store.log(`剪去一枝（连带 ${info.cut} 根），树把养分挪给了别的枝头。`, 'grow');
       this.updateFab();
       this.renderDock();
+    },
+
+    /* 应用内确认框：返回 Promise<boolean> */
+    askConfirm(opts) {
+      const o = opts || {};
+      return new Promise((resolve) => {
+        const mask = document.getElementById('ask');
+        if (!mask) {
+          resolve(window.confirm(o.text || '确认？'));
+          return;
+        }
+        document.getElementById('askTitle').textContent = o.title || '确认';
+        document.getElementById('askText').textContent = o.text || '';
+        const bOk = document.getElementById('askOk');
+        const bCancel = document.getElementById('askCancel');
+        bOk.textContent = o.ok || '确定';
+        bCancel.textContent = o.cancel || '取消';
+        bOk.classList.toggle('danger', o.danger !== false);
+        mask.classList.add('show');
+
+        const onKey = (e) => {
+          if (e.key === 'Escape') done(false);
+        };
+        function done(v) {
+          mask.classList.remove('show');
+          bOk.onclick = null;
+          bCancel.onclick = null;
+          mask.onclick = null;
+          document.removeEventListener('keydown', onKey);
+          resolve(v);
+        }
+        bOk.onclick = () => done(true);
+        bCancel.onclick = () => done(false);
+        mask.onclick = (e) => {
+          if (e.target === mask) done(false);
+        };
+        document.addEventListener('keydown', onKey);
+        setTimeout(() => bCancel.focus(), 30);
+      });
     },
 
     harvestEls(els) {

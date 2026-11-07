@@ -321,6 +321,16 @@ body.mode-harvest .fab { display: inline-flex; }
 }
 .slot:hover { transform: translateY(-2px); border-color: var(--line-2); }
 .slot .n { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1; }
+.lv .stagetag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  background: rgba(181, 140, 255, 0.14);
+  border: 1px solid rgba(181, 140, 255, 0.22);
+}
 .slot .dot {
   position: absolute;
   top: 5px;
@@ -860,4 +870,66 @@ body.mode-harvest .fab { display: inline-flex; }
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
   25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -190%) scale(1.02); }
+}
+
+/* ============ 确认框 ============ */
+.ask {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 4, 10, 0.52);
+  backdrop-filter: blur(3px);
+  z-index: 60;
+}
+.ask.show {
+  display: flex;
+  animation: askFade 0.16s ease;
+}
+.ask-card {
+  width: 306px;
+  max-width: calc(100% - 48px);
+  padding: 18px 18px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(32, 25, 45, 0.98), rgba(15, 11, 22, 0.99));
+  border: 1px solid rgba(180, 150, 240, 0.3);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.62);
+  animation: askPop 0.18s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.ask-card h4 {
+  font-size: 13.5px;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.ask-card p {
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+}
+.ask-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+.ask-btns .btn.danger {
+  background: rgba(255, 110, 130, 0.16);
+  border: 1px solid rgba(255, 110, 130, 0.5);
+  color: #ffd9de;
+}
+.ask-btns .btn.danger:hover {
+  background: rgba(255, 110, 130, 0.3);
+  border-color: rgba(255, 110, 130, 0.75);
+}
+@keyframes askFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes askPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: none; }
 }
