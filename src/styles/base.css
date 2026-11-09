@@ -891,8 +891,13 @@ body.rz-on .rz::after { opacity: 1; }
 
 /* ============ 确认框 ============ */
 .ask {
-  position: fixed;
-  inset: 0;
+  /* 弹窗挂在 .stage（树区那一列）里，绝对定位只盖住树区，
+   * 不遮右侧面板；面板打开时窗口再宽，弹窗也始终居中于树区 */
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   display: none;
   align-items: center;
   justify-content: center;
