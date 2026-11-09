@@ -57,8 +57,6 @@ function readGeom(saved) {
 }
 
 let win = null;
-let sunWin = null;
-let sunAligned = false;
 let firstRun = false; // 老存档没记过窗口位置：这次启动要把太阳重新摆到树冠上方
 
 /* ---------------- 键盘敲击统计 ---------------- */
@@ -223,7 +221,6 @@ function mergeEnvironment(data) {
   const d = Object.assign({}, data);
   d.ui = Object.assign({}, d.ui || {}, cur.ui || {});
   d.plugins = Object.assign({}, d.plugins || {}, cur.plugins || {});
-  d.sun = cur.sun || d.sun;
   d.lastSeen = Date.now();
   return d;
 }
@@ -433,18 +430,6 @@ function createWindow() {
         await win.webContents.executeJavaScript(`Store.addXp(${Number(process.argv[xi + 1]) || 0})`);
         await wait(1500);
       }
-      const suni = process.argv.indexOf('--sun');
-      if (suni > 0 && sunWin) {
-        const [sx, sy] = String(process.argv[suni + 1]).split(',').map(Number);
-        const wa = workArea();
-        sunWin.setBounds({
-          x: Math.round(wa.x + wa.width * sx - sunSize / 2),
-          y: Math.round(wa.y + wa.height * sy - sunSize / 2),
-          width: sunSize,
-          height: sunSize
-        });
-        await wait(900);
-      }
       try {
         const d = screen.getPrimaryDisplay();
         const sources = await require('electron').desktopCapturer.getSources({
@@ -498,9 +483,9 @@ function createWindow() {
           const t0 = performance.now();
           __app.renderTree(false);
           const cost = (performance.now()-t0).toFixed(1);
-          return 'sun=' + JSON.stringify(__app.sunPos) + ' tilt=' + __app.built.stats.sunTilt + ' genMs=' + cost;
+          return 'tilt=' + __app.built.stats.sunTilt + ' genMs=' + cost;
         })()`);
-        console.log('[gallery] sun =', drag);
+        console.log('[gallery] tilt =', drag);
         const fps = await exec(`new Promise((r)=>{let n=0;const t0=performance.now();function f(){n++;const dt=performance.now()-t0;if(dt<2500)requestAnimationFrame(f);else r((n/(dt/1000)).toFixed(1))}requestAnimationFrame(f)})`);
         console.log('[gallery] fps =', fps);
         const dump = await exec(`JSON.stringify({level: Store.state.level, xp: Store.state.xp, total: Store.state.totalXp, codex: Store.state.codex.length, journal: Store.state.journal.length, branches: __app.built.stats.branches, flowers: __app.built.stats.flowers, leaves: __app.built.stats.leaves})`);
@@ -527,18 +512,6 @@ function createWindow() {
           const ei = process.argv.indexOf('--eval');
           if (ei > 0) {
             console.log('[eval]', await win.webContents.executeJavaScript(String(process.argv[ei + 1])));
-          }
-          const suni = process.argv.indexOf('--sun');
-          if (suni > 0 && sunWin) {
-            const [sx, sy] = String(process.argv[suni + 1]).split(',').map(Number);
-            const wa = workArea();
-            sunWin.setBounds({
-              x: Math.round(wa.x + wa.width * sx - sunSize / 2),
-              y: Math.round(wa.y + wa.height * sy - sunSize / 2),
-              width: sunSize,
-              height: sunSize
-            });
-            await new Promise((r) => setTimeout(r, 800));
           }
           const sci = process.argv.indexOf('--scale');
           if (sci > 0) {
@@ -585,147 +558,18 @@ function createWindow() {
   // 注意：'moved' 只有 macOS 才有，Windows 上得听 'move'
   const onGeomChange = () => {
     rememberBounds();
-    broadcastSunSoon();
     broadcastBoundsSoon();
   };
   win.on('move', onGeomChange);
   win.on('resize', onGeomChange);
   win.on('moved', onGeomChange);
   win.on('resized', onGeomChange);
-  win.webContents.on('did-finish-load', () => setTimeout(broadcastSun, 400));
   win.on('close', (e) => {
     if (!quitting) {
       e.preventDefault();
       win.hide();
     }
   });
-}
-
-/* ---------------- 太阳：独立小窗口，可拖到屏幕任意位置 ---------------- */
-const SUN_SIZE_DEF = 108; // 窗口要留出光晕的余量，等于球体直径的话边框会被硬切
-const SUN_SIZE_MIN = 64;
-const SUN_SIZE_MAX = 240;
-let sunSize = SUN_SIZE_DEF;
-
-function createSunWindow() {
-  const saved = (readState() && readState().sun) || {};
-  sunSize = clamp(Math.round(Number(saved.size) || SUN_SIZE_DEF), SUN_SIZE_MIN, SUN_SIZE_MAX);
-  const wa = workArea();
-  // 首次启动：把太阳放在树冠正上方（而不是屏幕 24% 处——那会让树永远往左倒）
-  const tb = win && !win.isDestroyed() ? win.getBounds() : null;
-  const treeW = tb ? STAGE_W * geom.z : STAGE_W;
-  const defX = tb ? tb.x + treeW / 2 : wa.x + wa.width * 0.5;
-  const defY = tb ? Math.max(wa.y + sunSize / 2 + 6, tb.y + 34) : wa.y + wa.height * 0.14;
-  const cx = typeof saved.x === 'number' ? saved.x : defX;
-  const cy = typeof saved.y === 'number' ? saved.y : defY;
-  const half = sunSize / 2;
-  const x = Math.round(Math.min(Math.max(cx - half, wa.x - half), wa.x + wa.width - half));
-  const y = Math.round(Math.min(Math.max(cy - half, wa.y - half), wa.y + wa.height - half));
-
-  sunWin = new BrowserWindow({
-    width: sunSize,
-    height: sunSize,
-    x,
-    y,
-    frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    hasShadow: false,
-    resizable: false,
-    maximizable: false,
-    minimizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    show: false,
-    title: '太阳',
-    webPreferences: {
-      preload: path.join(ROOT, 'src', 'sun-preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  });
-  sunWin.loadFile(path.join(ROOT, 'src', 'sun.html'));
-
-  // 调试：把太阳窗口单独截出来（透明底），检查光晕有没有被窗口边界切到
-  if (process.argv.includes('--suncap')) {
-    const out = process.argv[process.argv.indexOf('--suncap') + 1] || path.join(ROOT, 'sun.png');
-    sunWin.webContents.once('did-finish-load', () => {
-      setTimeout(async () => {
-        try {
-          const api = await sunWin.webContents.executeJavaScript('typeof window.sunApi');
-          console.log('[suncap] sunApi =', api, 'size =', sunWin.getBounds().width);
-          const img = await sunWin.webContents.capturePage();
-          fs.writeFileSync(out, img.toPNG());
-          console.log('[suncap] saved to', out);
-        } catch (e) {
-          console.error('[suncap] failed', e);
-        }
-        quitting = true;
-        app.quit();
-      }, 1200);
-    });
-  }
-  // 首启：等主窗口定位完成后再把太阳摆到树冠正上方（创建瞬间的 bounds 还不可靠）
-  sunAligned = typeof saved.x === 'number';
-  if (!sunAligned) {
-    sunWin.once('ready-to-show', () => setTimeout(alignSunOverTree, 500));
-  }
-  sunWin.setAlwaysOnTop(true, 'floating');
-  sunWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  sunWin.once('ready-to-show', () => sunWin.showInactive());
-  sunWin.on('moved', () => broadcastSun());
-  sunWin.on('closed', () => {
-    sunWin = null;
-  });
-}
-
-/* 把太阳摆到树区正上方（首次启动，或用户从菜单里点"重置太阳位置"） */
-function alignSunOverTree() {
-  if (!sunWin || sunWin.isDestroyed() || !win || win.isDestroyed()) return;
-  const wa = workArea();
-  const tb = win.getBounds();
-  const treeW = STAGE_W * geom.z;
-  const half = sunSize / 2;
-  const cx = tb.x + treeW / 2;
-  const cy = Math.max(wa.y + half + 6, tb.y + 30);
-  sunWin.setBounds({
-    x: Math.round(Math.min(Math.max(cx - half, wa.x - half), wa.x + wa.width - half)),
-    y: Math.round(Math.min(Math.max(cy - half, wa.y - half), wa.y + wa.height - half)),
-    width: sunSize,
-    height: sunSize
-  });
-  sunAligned = true;
-  broadcastSun({ fresh: true });
-}
-
-function broadcastSun(extra) {
-  if (!win || win.isDestroyed()) return;
-  if (!sunWin || sunWin.isDestroyed()) return;
-  const sb = sunWin.getBounds();
-  win.webContents.send(
-    'sun',
-    Object.assign(
-      {
-        x: sb.x + sb.width / 2,
-        y: sb.y + sb.height / 2,
-        size: sunSize,
-        win: win.getBounds()
-      },
-      extra || {}
-    )
-  );
-}
-
-/* 拖动窗口/缩放时 moved/resized 会连发几十次，节流一下，别让渲染进程重绘整棵树 */
-let sunTimer = null;
-function broadcastSunSoon() {
-  if (sunTimer) return;
-  sunTimer = setTimeout(() => {
-    sunTimer = null;
-    broadcastSun();
-  }, 90);
 }
 
 /* 窗口矩形变了就告诉渲染进程一声（用户拖顶栏挪窗口时，页面里的坐标也要跟上） */
@@ -738,47 +582,7 @@ function broadcastBoundsSoon() {
   }, 50);
 }
 
-ipcMain.handle('sun:get', () => {
-  if (!sunWin || sunWin.isDestroyed() || !win || !sunAligned) return null;
-  const sb = sunWin.getBounds();
-  return { x: sb.x + sb.width / 2, y: sb.y + sb.height / 2, size: sunSize, win: win.getBounds() };
-});
 
-/* 改太阳大小：以圆心为锚，滚轮和设置里的滑杆都走这里 */
-function setSunSize(px) {
-  if (!sunWin || sunWin.isDestroyed()) return sunSize;
-  const size = clamp(Math.round(Number(px) || sunSize), SUN_SIZE_MIN, SUN_SIZE_MAX);
-  const b = sunWin.getBounds();
-  const cx = b.x + b.width / 2;
-  const cy = b.y + b.height / 2;
-  const wa = workArea();
-  const half = size / 2;
-  sunSize = size;
-  sunWin.setBounds({
-    x: Math.round(clamp(cx - half, wa.x - half, wa.x + wa.width - half)),
-    y: Math.round(clamp(cy - half, wa.y - half, wa.y + wa.height - half)),
-    width: size,
-    height: size
-  });
-  broadcastSunSoon();
-  return size;
-}
-
-ipcMain.handle('sun:size', (_e, px) => setSunSize(px));
-ipcMain.handle('sun:size:get', () => sunSize);
-
-/* 天气：阴天/雨天把太阳压暗一点，和舞台上的云对得上 */
-ipcMain.handle('sun:dim', (_e, v) => {
-  if (!sunWin || sunWin.isDestroyed()) return false;
-  const op = clamp(Number(v) || 0, 0, 1);
-  sunWin.setOpacity(op);
-  return op;
-});
-
-ipcMain.handle('sun:top', (_e, on) => {
-  if (sunWin && !sunWin.isDestroyed()) sunWin.setAlwaysOnTop(!!on, 'floating');
-  return !!on;
-});
 
 /* ---------------- 穿透 / 显示控制 ---------------- */
 function applyIgnore(on) {
@@ -799,11 +603,9 @@ function toggleVisible() {
   if (!win) return;
   if (win.isVisible() && win.isFocused()) {
     win.hide();
-    if (sunWin && !sunWin.isDestroyed()) sunWin.hide();
   } else {
     win.showInactive();
     win.focus();
-    if (sunWin && !sunWin.isDestroyed()) sunWin.showInactive();
   }
 }
 
@@ -920,23 +722,6 @@ ipcMain.handle('win:geom', () => ({
   geom: Object.assign({}, geom)
 }));
 
-/* 渲染进程量出树冠顶部后，把太阳摆到它上面（只在新装/老存档没位置时做一次） */
-ipcMain.handle('sun:place', (_e, p) => {
-  if (!sunWin || sunWin.isDestroyed() || !p) return false;
-  const wa = workArea();
-  const half = sunSize / 2;
-  sunWin.setBounds({
-    x: Math.round(clamp(p.x - half, wa.x - half, wa.x + wa.width - half)),
-    y: Math.round(clamp(p.y - half, wa.y - half, wa.y + wa.height - half)),
-    width: sunSize,
-    height: sunSize
-  });
-  sunAligned = true;
-  broadcastSun({ fresh: true });
-  firstRun = false;
-  return true;
-});
-
 /* 渲染进程算好目标矩形，这里只负责落位 + 兜底夹取 */
 ipcMain.handle('win:bounds', (_e, b) => {
   if (!win || win.isDestroyed() || !b) return null;
@@ -962,7 +747,6 @@ ipcMain.on('geom:set', (_e, g) => {
 ipcMain.handle('win:top', (_e, on) => {
   if (!win) return false;
   win.setAlwaysOnTop(!!on, 'floating');
-  if (sunWin && !sunWin.isDestroyed()) sunWin.setAlwaysOnTop(!!on, 'floating');
   return !!on;
 });
 ipcMain.handle('win:overlay', (_e, on) => {
@@ -1052,7 +836,6 @@ if (!gotLock) {
     bootLog('--- app ready');
     app.setAppUserModelId('com.growtree.desktop');
     createWindow();
-    createSunWindow();
     startKeyWatcher();
     buildTray();
     globalShortcut.register('Ctrl+Alt+T', toggleVisible);

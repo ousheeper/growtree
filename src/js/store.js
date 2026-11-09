@@ -92,7 +92,7 @@
         stock: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 },
         buffs: { moistUntil: 0, bloomUntil: 0, lucky: false },
         season: null,
-        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0, soaked: 0, bigHarvest: 0, palettes: [], rains: 0, sold: 0, coinsEarned: 0, coinsSpent: 0, purchases: 0, seasons: [], seasonChanges: 0 },
+        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0, soaked: 0, bigHarvest: 0, palettes: [], rains: 0, snows: 0, sold: 0, coinsEarned: 0, coinsSpent: 0, purchases: 0, seasons: [], seasonChanges: 0 },
         weather: null,
         plugins: { enabled: null, order: null, active: 'codex', known: [] },
         ui: { panelOpen: true, alwaysOnTop: true, overlay: false, passThrough: false, scale: 1, stageH: 940, mode: 'water', barsAutoHide: false, soundOn: true, soundVolume: 0.5 }

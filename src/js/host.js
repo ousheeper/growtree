@@ -115,7 +115,6 @@
         on: (evt, fn) => Bus.on(evt, fn),
         scale: (v) => window.__app && window.__app.applyScale(v, true),
         uiFlag: (k, v) => window.__app && window.__app.setUiFlag(k, v),
-        sunSize: (px) => window.__app && window.__app.setSunSize(px),
         plugins: () => this.all(),
         switchTo: (pid) => this.mount(pid)
       };

@@ -68,7 +68,13 @@
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">${fn}</svg>`;
   }
 
-  const fmt = (v) => (v >= 10000 ? (v / 1000).toFixed(v >= 100000 ? 0 : 1) + 'k' : String(v));
+  // 进度数值统一保留一位小数：像「活满 30 天」这种按毫秒算出来的值
+  // 不处理会显示成 2.841651446759259 / 30
+  const fmt = (v) => {
+    const n = Math.round((Number(v) || 0) * 10) / 10;
+    if (n >= 10000) return (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k';
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  };
   const md = (ts) => {
     const d = new Date(ts);
     return d.getMonth() + 1 + '/' + d.getDate();

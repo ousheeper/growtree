@@ -75,11 +75,6 @@
               <span class="lb"><span>上下栏只在鼠标移入时出现</span><small>移开后淡出，桌面上只留一棵树</small></span>
               <span class="switch"><input type="checkbox" id="gBars" ${ctx.state.ui.barsAutoHide ? 'checked' : ''}><i></i></span>
             </label>
-            <div class="gen-row" style="margin-top:12px">
-              <div class="lb"><span>太阳大小</span><b id="lb-sun"></b></div>
-              <input type="range" id="gSun" min="64" max="240" step="4" value="${(ctx.state.sun && ctx.state.sun.size) || 108}">
-            </div>
-            <div class="hint-line">也可以把鼠标放到太阳上滚轮缩放</div>
           </div>
 
           <div class="gen-group">
@@ -165,23 +160,6 @@
         syncScale();
         ctx.scale(Number(scaleInput.value));
       };
-
-      /* 太阳大小 */
-      const sunInput = root.querySelector('#gSun');
-      const sunLb = root.querySelector('#lb-sun');
-      const syncSun = () => (sunLb.textContent = Number(sunInput.value) + 'px');
-      syncSun();
-      sunInput.oninput = () => {
-        syncSun();
-        ctx.sunSize(Number(sunInput.value));
-      };
-      // 滚轮改大小的时候滑杆跟着走（拖滑杆时不要抢）
-      ctx.on('sun-size', (v) => {
-        if (document.activeElement === sunInput) return;
-        if (Number(sunInput.value) === v) return;
-        sunInput.value = v;
-        syncSun();
-      });
 
       /* 声音 */
       const sndCb = root.querySelector('#gSound');

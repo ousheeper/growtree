@@ -57,6 +57,7 @@
     { id: 'codex_all', cat: 'explore', tier: 3, icon: 'book', name: '全知', desc: '收齐所有图鉴词条', goal: (window.CODEX_ITEMS && window.CODEX_ITEMS.length) || 72, value: (s) => n((s.codex || []).length) },
     { id: 'rain_first', cat: 'explore', tier: 1, icon: 'drop', name: '听雨', desc: '经历第一场雨', goal: 1, value: (s) => n(s.stats.rains) },
     { id: 'rain_ten', cat: 'explore', tier: 2, icon: 'drop', name: '雨中人', desc: '经历 10 场雨', goal: 10, value: (s) => n(s.stats.rains) },
+    { id: 'first_snow', cat: 'explore', tier: 1, icon: 'drop', name: '初雪', desc: '经历第一场雪', goal: 1, value: (s) => n(s.stats.snows) },
     { id: 'first_sale', cat: 'harvest', tier: 1, icon: 'basket', name: '第一笔生意', desc: '在仓库卖出第一份收货', goal: 1, value: (s) => n(s.stats.sold) },
     { id: 'coin_500', cat: 'harvest', tier: 2, icon: 'coin', name: '小有积蓄', desc: '身上持有 500 金币', goal: 500, value: (s) => n(s.coins) },
     { id: 'keys10k', cat: 'explore', tier: 1, icon: 'key', name: '指尖生风', desc: '全机累计敲击 10,000 次', goal: 10000, value: (s) => n(s.stats.keysTotal) },

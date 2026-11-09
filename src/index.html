@@ -11,6 +11,29 @@
 <body>
 <div id="app">
   <div class="stage" id="stage">
+    <!-- 天空：太阳 / 月亮按真实时间走，天气会盖住它们 -->
+    <div class="sky" id="sky" aria-hidden="true">
+      <div class="stars" id="skyStars"></div>
+      <div class="sky-body sun" id="skySun">
+        <span class="sky-glow"></span><span class="sky-core"></span><span class="sky-cloud"></span>
+      </div>
+      <div class="sky-body moon" id="skyMoon">
+        <span class="sky-glow"></span>
+        <svg class="moon-art" viewBox="0 0 100 100">
+          <defs>
+            <radialGradient id="moonGrad" cx="36%" cy="30%" r="78%">
+              <stop offset="0%" stop-color="#fffdf6"/>
+              <stop offset="58%" stop-color="#e9efff"/>
+              <stop offset="100%" stop-color="#b9c8e6"/>
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="42" fill="#141a2c" opacity=".32"/>
+          <path id="moonLit" fill="url(#moonGrad)"/>
+        </svg>
+        <span class="sky-cloud"></span>
+      </div>
+    </div>
+
     <svg id="tree" viewBox="0 0 460 800" preserveAspectRatio="xMidYMax meet" aria-hidden="true"></svg>
 
     <div class="clouds" id="clouds" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -111,6 +134,7 @@
 <script src="js/host.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/weather.js"></script>
+<script src="js/sky.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

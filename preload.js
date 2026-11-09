@@ -10,10 +10,6 @@ contextBridge.exposeInMainWorld('native', {
   setTop: (on) => ipcRenderer.invoke('win:top', on),
   setOverlay: (on) => ipcRenderer.invoke('win:overlay', on),
   setThrough: (on, silent) => ipcRenderer.invoke('win:through', on, !!silent),
-  getSun: () => ipcRenderer.invoke('sun:get'),
-  setSunTop: (on) => ipcRenderer.invoke('sun:top', on),
-  setSunSize: (px) => ipcRenderer.invoke('sun:size', px),
-  setSunDim: (v) => ipcRenderer.invoke('sun:dim', v),
 
   // 存档槽
   listSaves: () => ipcRenderer.invoke('saves:list'),
@@ -23,8 +19,6 @@ contextBridge.exposeInMainWorld('native', {
   exportSave: (data) => ipcRenderer.invoke('saves:export', data),
   importSave: () => ipcRenderer.invoke('saves:import'),
   openSavesDir: () => ipcRenderer.invoke('saves:open'),
-  placeSun: (x, y) => ipcRenderer.invoke('sun:place', { x, y }),
-  onSun: (cb) => ipcRenderer.on('sun', (_e, payload) => cb(payload)),
   onBounds: (cb) => ipcRenderer.on('bounds', (_e, b) => cb(b)),
   onKeys: (cb) => ipcRenderer.on('keys', (_e, payload) => cb(payload)),
   listPlugins: () => ipcRenderer.invoke('plugins:list'),

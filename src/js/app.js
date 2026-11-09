@@ -57,13 +57,12 @@
       this.applyUiFlags();
       if (window.Weather) Weather.init();
       if (window.Season) Season.init();
+      if (window.Sky) Sky.init();
       this._booted = true;
       if (window.native && window.native.onKeys) window.native.onKeys((p) => this.onKeys(p));
       this.mountInitial();
-      await this.initSun();
       this.setMode(ui.mode || 'water');
       this.renderTree(false);
-      this.alignSunToTree();
       this.updateBar();
       this.checkAchievements();
       this.startLoop();
@@ -420,81 +419,11 @@
       };
     },
 
-    /* 太阳位置 → 相对竖直方向的倾角（弧度）
-     * 只用窗口矩形做换算，不碰 SVG 坐标系 / zoom / 留白，避免算出反方向。
-     * 返回值的正负：正 = 太阳在右侧，负 = 左侧。强度系数在 tree.js 里乘。
-     */
+    /* 太阳/月亮的方位 → 相对竖直方向的倾角（弧度）
+     * 太阳现在是画面里的一颗天体，位置由真实时间决定（见 sky.js），
+     * 树只读它的方向来做向光与明暗。 */
     sunTiltNow() {
-      const sun = this.sunPos;
-      const wb = this.winBounds;
-      if (!sun || !wb) return null;
-      const treeW = 470;
-      const panelW = this.panelShown ? 380 : 0;
-      // 树区在窗口里占的宽度比例，树根位于树区水平中点、竖直 85.5% 处
-      const treeCx = 0.5 * (treeW / (treeW + panelW));
-      const groundFy = 0.855;
-      const fx = (sun.x - wb.x) / Math.max(1, wb.width);
-      const fy = (sun.y - wb.y) / Math.max(1, wb.height);
-      const dx = (fx - treeCx) * (wb.width / Math.max(1, wb.height));
-      const dy = fy - groundFy; // <0 = 在树根上方
-      const ang = Math.atan2(dx, -dy); // 相对竖直向上
-      const up = dy < 0 ? 1 : Math.max(0, 1 + dy * 2.6);
-      const tilt = Math.max(-1.35, Math.min(1.35, ang)) * 0.35 * up;
-      return Number(tilt.toFixed(4));
-    },
-
-    applySun(payload) {
-      if (!payload) return;
-      this.sunPos = { x: payload.x, y: payload.y };
-      this.winBounds = payload.win;
-      // 用户拖顶栏挪窗口时也走这条路：把本地矩形同步回来，
-      // 否则后面算缩放会拿着旧坐标，一算就歪
-      if (payload.win && !this._rzDrag) this.bounds = Object.assign({}, payload.win);
-      Store.state.sun = {
-        x: payload.x,
-        y: payload.y,
-        size: payload.size || (Store.state.sun && Store.state.sun.size) || 108
-      };
-      Bus.emit('sun-size', Store.state.sun.size);
-      if (payload.fresh) {
-        // 首启对齐：之前那一帧是按占位坐标冻结的，作废重算
-        Store.state.branchTilt = {};
-      }
-      Store.saveSoon(1500);
-      // 形状不重算（枝干冻结），只让光照跟过去；整体重绘一次即可刷新明暗
-      const now = performance.now();
-      const force = !!payload.fresh; // 首启对齐必须立刻重画，不能被节流吞掉
-      if (!force && now - (this._sunRender || 0) < 120) return;
-      this._sunRender = now;
-      this.renderTree(false);
-    },
-
-    async initSun() {
-      window.native.onSun((payload) => this.applySun(payload));
-      try {
-        const p = await window.native.getSun();
-        if (p) {
-          this.sunPos = { x: p.x, y: p.y };
-          this.winBounds = p.win;
-          Store.state.sun = { x: p.x, y: p.y, size: p.size || 108 };
-        }
-      } catch (e) {
-        /* ignore */
-      }
-      if (!this.sunPos) {
-        // 首次启动：主进程要等主窗口定位完成后才把太阳摆到树冠上方。
-        // 这里等它一下，否则第一帧会按错误位置冻结倾角。
-        await new Promise((res) => {
-          const t = setTimeout(res, 900);
-          const iv = setInterval(() => {
-            if (this.sunPos) {
-              clearInterval(iv);
-              clearTimeout(t);
-              res();
-            }
-          }, 60);
-        });
-      }
+      return window.Sky ? window.Sky.tilt() : null;
     },
 
     /* ---------- 交互 ---------- */
@@ -578,7 +507,7 @@
         if (document.body.classList.contains('bars-auto')) {
           document.body.classList.toggle('bars-show', this.inStage(last.x, last.y));
         }
-        if (this.userThrough || this._draggingSun || this._rzDrag) return;
+        if (this.userThrough || this._rzDrag) return;
         if (raf) return;
         raf = requestAnimationFrame(() => {
           raf = null;
@@ -586,19 +515,6 @@
           const hit = !!(el && el.closest('.ui-hit'));
           this.setIgnore(!hit);
         });
-      });
-    },
-
-    /* 改太阳大小（设置里的滑杆调用；滚轮缩放走太阳窗口自己的 preload） */
-    setSunSize(px) {
-      if (!window.native.setSunSize) return;
-      const v = Math.round(Number(px) || 108);
-      window.native.setSunSize(v).then((applied) => {
-        if (typeof applied === 'number' && Store.state.sun) {
-          Store.state.sun.size = applied;
-          Store.saveSoon();
-          Bus.emit('sun-size', applied);
-        }
       });
     },
 
@@ -668,7 +584,6 @@
         if (g) {
           this.bounds = g.bounds;
           this.workArea = g.workArea;
-          this.firstRun = !!g.firstRun;
         }
       } catch (e) {
         /* ignore */
@@ -741,28 +656,6 @@
     syncZoomLabel() {
       const zl = document.getElementById('zoomVal');
       if (zl) zl.textContent = Math.round(this.z * 100) + '%';
-    },
-
-    /* 老存档没记过窗口位置：树现在的位置是重新摆的，太阳也得跟着挪到树冠上方，
-     * 否则它会卡在树中间（太阳是独立窗口，画在树的上面）。 */
-    alignSunToTree() {
-      if (!this.firstRun || !this.sunPos || !window.native.placeSun) return;
-      this.firstRun = false;
-      const svg = document.getElementById('tree');
-      const root = document.querySelector('#tree .layer-branch'); // 枝干层，比整棵（含浮游孢子）更贴近树冠
-      if (!svg || !root || !root.getBBox) return;
-      let bb;
-      try {
-        bb = root.getBBox();
-      } catch (e) {
-        return;
-      }
-      if (!bb || !bb.height) return;
-      const r = svg.getBoundingClientRect();
-      const k = Math.min(r.width / 460, r.height / 800) || 1;
-      // viewBox y=800 对齐元素底边，树冠顶部就是 bbox.y
-      const crownY = Math.round(screenY + r.bottom - (800 - bb.y) * k);
-      window.native.placeSun(this.sunPos.x, crownY - 62);
     },
 
     /* 缩放：以树根（树区底边中点）为锚点，脚下的土不动，只是整体变大变小 */
@@ -1004,7 +897,6 @@
       Store.state.ui.alwaysOnTop = on;
       Store.saveSoon();
       window.native.setTop(on);
-      window.native.setSunTop(on);
       const btn = $('#btnTop');
       btn.classList.toggle('on', on);
       btn.textContent = on ? '置 顶' : '不 挡';
