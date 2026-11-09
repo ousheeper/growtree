@@ -335,3 +335,196 @@ input[type='range']::-webkit-slider-thumb {
 .ring .lbl { position: absolute; bottom: 56px; font-size: 10px; letter-spacing: 3px; color: var(--dim); }
 .pomo-ctrls { display: flex; gap: 8px; }
 .pomo-tip { font-size: 11px; color: var(--dim); text-align: center; line-height: 1.7; }
+
+/* ============ 成就 ============ */
+.ach { display: flex; flex-direction: column; gap: 10px; }
+
+.ach-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+.ach-title {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 14px;
+  letter-spacing: 3px;
+  font-weight: 500;
+}
+.ach-title small {
+  font-size: 8.5px;
+  letter-spacing: 1.8px;
+  color: var(--dim);
+  font-weight: 400;
+}
+.ach-count {
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.ach-count b { color: var(--gold); font-size: 18px; font-weight: 400; }
+.ach-count em {
+  font-style: normal;
+  color: var(--muted);
+  margin-left: 6px;
+  padding-left: 7px;
+  border-left: 1px solid var(--line);
+}
+
+.ach-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.ach-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7c5bff, #c79bff 55%, #e6c684);
+  box-shadow: 0 0 10px rgba(199, 155, 255, 0.55);
+  transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.ach-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.ach-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  transition: 0.16s;
+}
+.ach-tab b { font-weight: 400; font-size: 9.5px; color: var(--dim); }
+.ach-tab:hover { color: var(--ink); background: rgba(255, 255, 255, 0.07); }
+.ach-tab.on {
+  color: var(--gold);
+  background: rgba(230, 198, 132, 0.1);
+  border-color: rgba(230, 198, 132, 0.4);
+}
+.ach-tab.on b { color: rgba(230, 198, 132, 0.75); }
+
+.ach-grid { display: flex; flex-direction: column; gap: 6px; }
+.ach-card {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
+  border: 1px solid var(--line);
+  overflow: hidden;
+  transition: border-color 0.18s, transform 0.18s;
+}
+.ach-card:hover { transform: translateY(-1px); border-color: var(--line-2); }
+
+.ach-card .medal {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  background: radial-gradient(circle at 36% 30%, rgba(255, 255, 255, 0.1), rgba(14, 11, 22, 0.9));
+  border: 1px solid rgba(180, 150, 240, 0.22);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.06);
+}
+.ach-card .abody { flex: 1; min-width: 0; }
+.ach-card .line { display: flex; align-items: center; gap: 6px; }
+.ach-card .nm { font-size: 12.5px; color: var(--ink); letter-spacing: 0.5px; }
+.ach-card .tier {
+  margin-left: auto;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  opacity: 0.72;
+}
+.ach-card .ds { font-size: 10.5px; color: var(--muted); opacity: 0.9; margin-top: 3px; line-height: 1.5; }
+.ach-card.lock .ds { color: var(--dim); opacity: 1; }
+
+.ach-prog {
+  height: 3px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.ach-prog i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #6f5bd8, #b58cff);
+}
+.ach-card .foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 9.5px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.ach-card .foot .ok { color: rgba(230, 198, 132, 0.85); letter-spacing: 0.5px; }
+
+.ach-card.lock .medal { opacity: 0.5; filter: saturate(0.6); }
+.ach-card.lock .nm { color: var(--muted); }
+
+.ach-card.got { background: linear-gradient(160deg, rgba(230, 198, 132, 0.11), rgba(255, 255, 255, 0.02)); }
+.ach-card.got.t1 { border-color: rgba(159, 214, 187, 0.3); }
+.ach-card.got.t2 { border-color: rgba(143, 185, 216, 0.32); }
+.ach-card.got.t3 { border-color: rgba(230, 198, 132, 0.4); }
+.ach-card.got.t1 .medal {
+  color: #9fd6bb;
+  border-color: rgba(159, 214, 187, 0.45);
+  box-shadow: 0 0 12px rgba(159, 214, 187, 0.15), inset 0 0 10px rgba(159, 214, 187, 0.1);
+}
+.ach-card.got.t2 .medal {
+  color: #8fb9d8;
+  border-color: rgba(143, 185, 216, 0.45);
+  box-shadow: 0 0 12px rgba(143, 185, 216, 0.16), inset 0 0 10px rgba(143, 185, 216, 0.1);
+}
+.ach-card.got.t3 .medal {
+  color: #e6c684;
+  border-color: rgba(230, 198, 132, 0.55);
+  box-shadow: 0 0 14px rgba(230, 198, 132, 0.22), inset 0 0 10px rgba(230, 198, 132, 0.12);
+}
+.ach-card.got.t1 .tier { color: #9fd6bb; }
+.ach-card.got.t2 .tier { color: #8fb9d8; }
+.ach-card.got.t3 .tier { color: #e6c684; }
+
+/* 新达成：一道很淡的高光扫过去 */
+.ach-card.new { animation: achPop 0.7s cubic-bezier(0.22, 0.61, 0.36, 1); }
+.ach-card.new::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 24%, rgba(255, 244, 210, 0.26) 48%, transparent 72%);
+  transform: translateX(-130%);
+  animation: achShine 0.95s ease 0.05s 1;
+}
+@keyframes achPop {
+  0% { transform: scale(0.975); }
+  45% { transform: scale(1.012); }
+  100% { transform: scale(1); }
+}
+@keyframes achShine {
+  to { transform: translateX(130%); }
+}
+
+/* 手记里的成就条目 */
+.jr-item[data-k='ach'] { border-left-color: var(--gold); color: #ddd0ab; }
+

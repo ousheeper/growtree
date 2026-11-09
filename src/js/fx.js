@@ -97,6 +97,22 @@
       if (el) el.style.setProperty('--tilt', '-1');
     },
 
+    /** 浇水落点：两圈很淡的水波，让水真的“落”在土上 */
+    ripple(x, y, color) {
+      const el = spawn('fx-rippling', x, y, '<span class="fx-ripple"></span><span class="fx-ripple d2"></span>', 1200);
+      if (el) el.style.setProperty('--rc', color || 'rgba(150, 210, 255, 0.85)');
+    },
+
+    /** 成就：一圈金环 + 几粒光点 + 小小的 ✦，比升级更轻 */
+    achievement(x, y) {
+      const inner = `<span class="fx-ring gold"></span>
+        <i class="fx-mote" style="--i:0"></i><i class="fx-mote" style="--i:1"></i>
+        <i class="fx-mote" style="--i:2"></i><i class="fx-mote" style="--i:3"></i>
+        <b class="fx-ach">✦</b>`;
+      const el = spawn('fx-achieving', x, y, inner, 2000);
+      if (el) el.style.setProperty('--spark', '#ffe6b0');
+    },
+
     /** 修剪：剪刀在剪口闭合两下 + 木屑飞散 */
     shear(x, y) {
       spawn('fx-shearing', x, y, SHEAR, 1400);

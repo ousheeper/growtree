@@ -398,7 +398,7 @@ function createWindow() {
         const r = await exec(`(Store.addXp(400), Store.state.level + '/' + Store.state.codex.length)`);
         console.log('[gallery] after xp:', r);
         await wait(1500);
-        for (const id of ['codex', 'genes', 'journal', 'stats', 'pomodoro', '__manager']) {
+        for (const id of ['codex', 'genes', 'journal', 'stats', 'achievements', 'pomodoro', '__manager']) {
           await exec(`Host.mount('${id}')`);
           await wait(650);
           await grab(id);

@@ -60,8 +60,11 @@
           card('累计生长值', s.totalXp),
           card('本轮进度', Math.floor(Store.xpPercent) + '<small>%</small>'),
           card('已收录词条', `${s.codex.length}<small>/${window.CODEX_ITEMS.length}</small>`),
+          card('已达成成就', `${window.Achieve ? window.Achieve.count() : 0}<small>/${window.Achieve ? window.Achieve.TOTAL : 0}</small>`),
           card('浇灌次数', s.stats.clicks || 0),
           card('土壤湿度', Math.round(s.soil || 0) + '<small>%</small>'),
+          card('湿润加成', (Store.soilBonus ? '+' + Store.soilBonus(s.soil) : '+0') + '<small>/4s</small>'),
+          card('浇透次数', s.stats.soaked || 0),
           card('今日敲击', (s.stats.keysToday || 0).toLocaleString()),
           card('累计敲击', (s.stats.keysTotal || 0).toLocaleString()),
           card('敲击换养分', s.stats.keyNut || 0),
@@ -78,7 +81,7 @@
         ].join('');
 
         const h = s.stats.harvest || {};
-        harvEl.innerHTML = CATS.map((c) => card(c.name, h[c.key] || 0)).join('') + card('累计', s.stats.decoTotal || 0);
+        harvEl.innerHTML = CATS.map((c) => card(c.name, h[c.key] || 0)).join('') + card('累计', s.stats.decoTotal || 0) + card('一次最多', s.stats.bigHarvest || 0);
       }
 
       root.querySelector('#stGrow').onclick = () => {
@@ -107,6 +110,7 @@
       offs.push(ctx.on('xp', render));
       offs.push(ctx.on('levelup', render));
       offs.push(ctx.on('codex', render));
+      offs.push(ctx.on('achievement', render));
       const timer = setInterval(render, 20000);
 
       return {

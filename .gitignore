@@ -2,8 +2,9 @@
 node_modules/
 dist/
 out/
+.electron-dist/
 
-# 调试产物
+# 调试产物（--gallery / --shot 生成的截图与日志）
 ui-*.png
 desktop.png
 el.log
@@ -14,10 +15,7 @@ state.json
 .DS_Store
 Thumbs.db
 
-# 本地测试存档目录
-.test*/
-
-# 本地测试存档目录
+# 本地测试存档目录（--userdata 临时档 + 早期 Chromium 缓存）
 .test*/
 .t*/
 .h*/

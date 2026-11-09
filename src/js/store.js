@@ -17,11 +17,22 @@
     palette: 'cthulhu'
   };
 
-  const TICK_MS = 4000; // 每 4 秒 +1 生长值
-  // 浇水上限：土壤湿度模型（浇一次 +18，自然风干 0.3/秒，湿透时不再吸收）
+  const TICK_MS = 4000; // 每 4 秒来一次时间生长
+  // 土壤湿度模型：
+  //  - 浇一次 +24，自然风干 0.09/秒 → 一次能润 4 分半，浇满能撑 18 分钟
+  //  - 湿土会加成时间生长（见 soilBonus），浇水不再只是个数字
   const SOIL_MAX = 100;
-  const SOIL_POUR = 18;
-  const SOIL_DRY = 0.3;
+  const SOIL_POUR = 24;
+  const SOIL_DRY = 0.09;
+  const SOIL_GATE = 92; // 高于这个湿度就不再吸收，避免连点白浇
+
+  /* 湿土加成：35 以上 +1，70 以上 +2（每次时间生长额外给） */
+  function soilBonus(soil) {
+    if (typeof soil !== 'number') return 0;
+    if (soil >= 70) return 2;
+    if (soil >= 35) return 1;
+    return 0;
+  }
   // 键盘：每 40 键 +1 生长值，每 200 键 +1 养分
   const KEY_XP_EVERY = 40;
   const KEY_NUT_EVERY = 200;
@@ -76,8 +87,9 @@
         genes: Object.assign({}, DEFAULT_GENES),
         codex: [],
         journal: [],
-        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0 },
-        plugins: { enabled: null, order: null, active: 'codex' },
+        achievements: {},
+        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0, soaked: 0, bigHarvest: 0, palettes: [] },
+        plugins: { enabled: null, order: null, active: 'codex', known: [] },
         ui: { panelOpen: true, alwaysOnTop: true, overlay: false, passThrough: false, scale: 1, stageH: 940, mode: 'water', barsAutoHide: false }
       };
     },
@@ -94,6 +106,8 @@
       s.genes.species = Object.assign({ flower: true, fruit: true, mushroom: true, crystal: true }, (loaded.genes && loaded.genes.species) || {});
       if (!Array.isArray(s.codex)) s.codex = [];
       if (!Array.isArray(s.journal)) s.journal = [];
+      if (!s.achievements || typeof s.achievements !== 'object') s.achievements = {};
+      if (!Array.isArray(s.stats.palettes)) s.stats.palettes = [];
       if (!Array.isArray(s.pruned)) s.pruned = [];
       // 自愈：主干（'r' 或不含层级的路径）不能剪，历史存档里若有就丢掉，否则整棵树是空的
       s.pruned = s.pruned.filter((x) => typeof x === 'string' && x.indexOf('.') > 0);
@@ -122,6 +136,7 @@
       s.lastSeen = Date.now();
       this.state = s;
       this.tickAcc = 0;
+      this.notePalette();
 
       if (!s.journal.length) {
         s.journal.push({ t: Date.now(), kind: 'sys', text: '种子落进桌面，第一次呼吸发生在你看不见的时候。' });
@@ -176,11 +191,13 @@
 
     tick(dt) {
       const s = this.state;
-      if (s && typeof s.soil === 'number') s.soil = Math.max(0, s.soil - (dt / 1000) * SOIL_DRY);
+      if (!s) return;
+      if (typeof s.soil === 'number') s.soil = Math.max(0, s.soil - (dt / 1000) * SOIL_DRY);
       this.tickAcc = (this.tickAcc || 0) + dt;
       while (this.tickAcc >= TICK_MS) {
         this.tickAcc -= TICK_MS;
-        this.addXp(1, 'time');
+        // 湿土才有加成：这是「浇水」唯一的长期回报，也是它的意义所在
+        this.addXp(1 + soilBonus(s.soil), 'time');
       }
     },
 
@@ -188,14 +205,16 @@
       const now = Date.now();
       if (this._lastClick && now - this._lastClick < CLICK_CD) return null;
       const s = this.state;
-      // 土壤湿透就不再吸收：这是浇水的硬上限
+      // 土壤接近湿透就不再吸收：这是浇水的硬上限
       const soil = typeof s.soil === 'number' ? s.soil : 62;
-      if (soil > SOIL_MAX - SOIL_POUR) {
+      if (soil > SOIL_GATE) {
         this._lastClick = now; // 也吃冷却，避免连点刷提示
         return null;
       }
       this._lastClick = now;
       s.soil = Math.min(SOIL_MAX, soil + SOIL_POUR);
+      // 浇到满：记一次「浇透」
+      if (s.soil >= SOIL_MAX - 0.01) s.stats.soaked = (s.stats.soaked || 0) + 1;
       s.stats.clicks = (s.stats.clicks || 0) + 1;
       s.nutrient += 1;
       const gain = CLICK_XP + (Math.random() < 0.18 ? 2 : 0);
@@ -309,9 +328,23 @@
 
     patchGenes(genes) {
       this.state.genes = Object.assign({}, this.state.genes, genes);
+      this.notePalette();
       this.saveSoon();
       emit('genes', this.state.genes);
     },
+
+    /* 记下用过的花色（成就用）。genes 插件是就地改 state 的，所以这里单独抽一个口子 */
+    notePalette() {
+      const s = this.state;
+      if (!s || !s.genes || !s.genes.palette) return;
+      const arr = s.stats.palettes || (s.stats.palettes = []);
+      if (!arr.includes(s.genes.palette)) {
+        arr.push(s.genes.palette);
+        this.saveSoon();
+      }
+    },
+
+    soilBonus,
 
     saveSoon(delay) {
       clearTimeout(this._saveTimer);

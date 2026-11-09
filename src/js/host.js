@@ -10,11 +10,21 @@
     active: null,
     instance: null,
     el: {},
+    news: new Set(), // 没打开过的插件里发生了值得看的事（成就/收录）
 
     init() {
       this.el.tabs = document.getElementById('tabs');
       this.el.body = document.getElementById('panelBody');
       Bus.on('refresh-tabs', () => this.renderTabs());
+      // 有成就解锁：给「成就」标签挂一个小金点，点进去就消掉
+      Bus.on('achievement', () => {
+        // 面板关着的时候，哪怕正停在成就页，也要点一下小点提醒
+        const panelOpen = !Store.state || !Store.state.ui || Store.state.ui.panelOpen !== false;
+        if (this.active !== 'achievements' || !panelOpen) {
+          this.news.add('achievements');
+          this.renderTabs();
+        }
+      });
     },
 
     register(meta) {
@@ -27,6 +37,25 @@
 
     all() {
       return Array.from(registry.values());
+    },
+
+    /* 新版本带了一个新插件：老存档的启用列表里没有它，
+     * 自动补进去一次；用户自己关掉的旧插件不受影响（known 里已经有它了） */
+    syncNew() {
+      const cfg = Store.state && Store.state.plugins;
+      if (!cfg) return;
+      const ids = this.all().map((p) => p.id);
+      // 老存档没有 known：用 order 当「上次见过哪些插件」的近似，
+      // 免得把用户故意关掉的旧插件又打开
+      const known = Array.isArray(cfg.known) ? cfg.known : Array.isArray(cfg.order) ? cfg.order : [];
+      const added = ids.filter((id) => !known.includes(id));
+      if (Array.isArray(cfg.enabled)) {
+        added.forEach((id) => {
+          if (!cfg.enabled.includes(id)) cfg.enabled.push(id);
+        });
+      }
+      cfg.known = ids.slice();
+      if (added.length) Store.saveSoon();
     },
 
     /** 按用户配置（启用/顺序）过滤 */
@@ -50,7 +79,7 @@
       tabs.innerHTML = '';
       for (const p of list) {
         const b = document.createElement('button');
-        b.className = 'tab' + (this.active === p.id ? ' on' : '');
+        b.className = 'tab' + (this.active === p.id ? ' on' : '') + (this.news.has(p.id) ? ' has-new' : '');
         b.dataset.id = p.id;
         b.title = p.desc || p.name;
         b.innerHTML = `<span class="tab-ico">${p.icon}</span><span class="tab-txt">${p.name}</span>`;
@@ -72,6 +101,7 @@
         },
         patch(fn) {
           if (typeof fn === 'function') fn(Store.state);
+          Store.notePalette();
           Store.saveSoon();
           Bus.emit('state-changed');
         },
@@ -103,6 +133,9 @@
       this.el.body.innerHTML = '';
       this.el.body.classList.remove('has-detail');
       this.active = id;
+      if (this.news.has(id)) {
+        this.news.delete(id);
+      }
 
       if (id === '__manager') {
         this.renderManager(this.el.body);

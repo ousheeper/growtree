@@ -46,6 +46,7 @@
       document.documentElement.style.zoom = this.z;
       Host.init();
       await this.loadPlugins();
+      Host.syncNew();
       this.bindUi();
       this.bindStore();
       this.bindNative();
@@ -59,6 +60,7 @@
       this.renderTree(false);
       this.alignSunToTree();
       this.updateBar();
+      this.checkAchievements();
       this.startLoop();
 
       if (Store.overlay) {
@@ -106,8 +108,16 @@
     /* ---------- 树 ---------- */
     /* 只改数字，避免整块重绘 */
     updateSoil() {
-      const el = document.querySelector('[data-slot="soil"] .n');
-      if (el) el.textContent = Math.round(Store.state.soil || 0);
+      const slot = document.querySelector('[data-slot="soil"]');
+      if (!slot) return;
+      const n = Math.max(0, Math.min(100, Math.round(Store.state.soil || 0)));
+      const el = slot.querySelector('.n');
+      if (el) el.textContent = n;
+      const m = slot.querySelector('.meter i');
+      if (m) m.style.width = n + '%';
+      const bonus = Store.soilBonus ? Store.soilBonus(n) : 0;
+      slot.classList.toggle('wet', bonus > 0);
+      slot.title = '土壤湿度 ' + n + '%' + (bonus ? ' · 湿润加成 +' + bonus + '/4s' : ' · 干了就没有加成');
     },
 
     updateKeys() {
@@ -202,10 +212,17 @@
         { k: '词条', n: s.codex.length, c: '#e6c684' }
       ];
       $('#slots').innerHTML = items
-        .map(
-          (i) =>
-            `<div class="slot" data-slot="${i.id || ''}" title="${i.k}"><i class="dot" style="background:${i.c}"></i><span class="n">${i.n}</span><span class="k">${i.k}</span></div>`
-        )
+        .map((i) => {
+          const wet = i.id === 'soil' ? (Store.soilBonus ? Store.soilBonus(i.n) : 0) : 0;
+          const tip = i.id === 'soil'
+            ? `土壤湿度 ${i.n}%${wet ? ' · 湿润加成 +' + wet + '/4s' : ' · 干了就没有加成'}`
+            : i.k;
+          return `<div class="slot${wet ? ' wet' : ''}" data-slot="${i.id || ''}" style="--sc:${i.c}" title="${tip}">
+            <i class="dot" style="background:${i.c}"></i>
+            <span class="n">${i.n}</span><span class="k">${i.k}</span>
+            ${i.id === 'soil' ? `<span class="meter"><i style="width:${Math.max(0, Math.min(100, i.n))}%"></i></span>` : ''}
+          </div>`;
+        })
         .join('');
     },
 
@@ -217,6 +234,7 @@
       if (sn && this.built && this.built.stats.stageLabel) sn.textContent = this.built.stats.stageLabel;
       const p = Store.xpPercent;
       $('#xpFill').style.width = p.toFixed(1) + '%';
+      $('#xpFill').classList.toggle('near', p >= 88);
       $('#pct').textContent = Math.floor(p) + '%';
     },
 
@@ -284,6 +302,7 @@
       Store.log(`剪去一枝（连带 ${info.cut} 根），树把养分挪给了别的枝头。`, 'grow');
       this.updateFab();
       this.renderDock();
+      this.checkAchievements();
     },
 
     poke(x, y) {
@@ -353,6 +372,7 @@
         n += 1;
       });
       if (!n) return 0;
+      if (n > (s.stats.bigHarvest || 0)) s.stats.bigHarvest = n;
       Store.markPicked(pickedIds);
       const spark = (this.built && this.built.stats && this.built.stats.glow) || '#ffe3a8';
       spots.slice(0, 6).forEach((pt, i) => {
@@ -368,6 +388,7 @@
         .join(' · ');
       this.toast(`收获 ${n} 份 · ${parts} · 养分 +${n}`);
       Store.log(`收下 ${n} 份（${parts}），枝头轻了一些。`, 'feed');
+      this.checkAchievements();
       return n;
     },
 
@@ -860,18 +881,23 @@
       const gain = Store.feed();
       if (gain == null) {
         const soil = Store.state.soil;
-        if (typeof soil === 'number' && soil > 100 - 18) {
-          this.toast('土还湿着，等它干一点再浇（' + Math.round(soil) + '%）');
+        if (typeof soil === 'number' && soil > 92) {
+          this.toast('土还挺湿（' + Math.round(soil) + '%），等干一点再浇');
         }
         return;
       }
       this.updateSoil();
       this.floatText(x, y, '+' + gain);
       this.sparks(x, y, 6);
-      // 水壶就在你点的地方倒水
-      if (window.Fx) window.Fx.water(x, y);
+      // 水壶就在你点的地方倒水，落点荡开两圈水波
+      if (window.Fx) {
+        window.Fx.water(x, y);
+        window.Fx.ripple(x, y + 34);
+      }
       this.updateBar();
       this.renderDock();
+      this.updateSoil();
+      this.checkAchievements();
       if (Store.state.stats.clicks % 6 === 0) {
         Store.log('又浇了一层露水，土面浮起细小的气泡。', 'feed');
       }
@@ -884,6 +910,11 @@
       $('#btnPanel').classList.toggle('on', open);
       Store.state.ui.panelOpen = open;
       Store.saveSoon();
+      // 打开面板就当你已经看到了当前页的新东西
+      if (open && window.Host && Host.news) {
+        Host.news.delete(Host.active);
+        Host.renderTabs();
+      }
       window.native.setGeom({ z: this.z, stageH: this.stageH, panelOpen: open });
       clearTimeout(this._panelTimer);
       if (open) {
@@ -1021,8 +1052,9 @@
         Store.tick(dt);
         this.updateBar();
         this.updateSoil();
+        if (++sec % 2 === 0) this.checkAchievements();
         // 摘掉的花果到时间了会长回来，隔 45 秒查一次，有变化才重绘
-        if (++sec % 45 === 0 && Store.state.picked.length) {
+        if (sec % 45 === 0 && Store.state.picked.length) {
           const before = Store.state.picked.length;
           if (Store.freshPicked().length < before) this.renderTree(true);
         }
@@ -1041,12 +1073,50 @@
       return { x: (x - r.left) / z, y: (y - r.top) / z };
     },
 
-    toast(text) {
+    /* 提示改成队列：升级、成就、浇水提示挨在一起时不会互相顶掉 */
+    toast(text, kind) {
+      if (!text) return;
+      this._toastQ = this._toastQ || [];
+      this._toastQ.push({ text, kind: kind || '' });
+      if (this._toastQ.length > 4) this._toastQ.splice(0, this._toastQ.length - 4);
+      if (!this._toastBusy) this.runToast();
+    },
+
+    runToast() {
       const el = $('#toast');
-      el.textContent = text;
-      el.classList.add('show');
+      const item = this._toastQ && this._toastQ.shift();
+      if (!item) {
+        this._toastBusy = false;
+        el.classList.remove('show');
+        return;
+      }
+      this._toastBusy = true;
+      el.className = 'toast show' + (item.kind ? ' ' + item.kind : '');
+      el.textContent = item.text;
       clearTimeout(this._toastTimer);
-      this._toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+      this._toastTimer = setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => {
+          this._toastBusy = false;
+          this.runToast();
+        }, 300);
+      }, 2400);
+    },
+
+    /* 成就判定：返回新解锁列表，弹一条提示 + 树根处一圈很淡的金光 */
+    checkAchievements() {
+      if (!window.Achieve) return;
+      const now = Date.now();
+      if (now - (this._achAt || 0) < 1500) return;
+      this._achAt = now;
+      const got = window.Achieve.check(this.built && this.built.stats);
+      if (!got || !got.length) return;
+      if (got.length === 1) this.toast('成就解锁 · ' + got[0].name, 'ach-toast');
+      else this.toast('解锁 ' + got.length + ' 项成就 · 见「成就」页', 'ach-toast');
+      this.baseBurst(Math.min(22, 8 + got.length * 3));
+      const p = this.svgPt(230, 638);
+      if (window.Fx && p) window.Fx.achievement(p.x, p.y - 46);
+      Bus.emit('refresh-tabs');
     },
 
     floatText(x, y, text) {

@@ -1,14 +1,17 @@
 {
   "name": "desktop-growtree",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "description": "Desktop growth tree widget with hot-swappable side panels",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "icon": "node tools/make-icon.js",
-    "dist": "electron-builder --win portable",
-    "dist:dir": "electron-builder --win --dir"
+    "trim": "node tools/trim-electron.js",
+    "dist": "npm run dist:slim",
+    "dist:slim": "node tools/trim-electron.js && electron-builder --win portable -c.electronDist=.electron-dist",
+    "dist:full": "electron-builder --win portable",
+    "dist:dir": "node tools/trim-electron.js && electron-builder --win --dir -c.electronDist=.electron-dist"
   },
   "author": "shang",
   "license": "MIT",
@@ -28,7 +31,19 @@
       "preload.js",
       "src/**/*",
       "plugins/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/uiohook-napi/build/Debug/**",
+      "!node_modules/uiohook-napi/build/Release/obj/**",
+      "!node_modules/uiohook-napi/build/Release/*.lib",
+      "!node_modules/uiohook-napi/build/**/*.tlog",
+      "!node_modules/uiohook-napi/build/**/*.recipe",
+      "!node_modules/uiohook-napi/build/**/*.vcxproj*",
+      "!node_modules/uiohook-napi/build/**/*.pdb",
+      "!node_modules/uiohook-napi/src/**",
+      "!node_modules/uiohook-napi/libuiohook/**",
+      "!node_modules/uiohook-napi/prebuilds/darwin-*/**",
+      "!node_modules/uiohook-napi/prebuilds/linux-*/**",
+      "!node_modules/uiohook-napi/prebuilds/win32-arm64/**"
     ],
     "asarUnpack": [
       "plugins/**/*",
@@ -49,7 +64,7 @@
       "artifactName": "GrowTree-${version}-portable.exe",
       "unicode": true
     },
-    "compression": "normal"
+    "compression": "maximum"
   },
   "dependencies": {
     "uiohook-napi": "^1.5.5"
