@@ -17,7 +17,7 @@
 
 **方式一：下载现成 exe（最省事，推荐）**
 
-👉 **[下载 GrowTree-1.4.0-portable.exe](https://github.com/ousheeper/growtree/releases/latest)** — 约 70 MB，单文件便携版
+👉 **[下载 GrowTree-1.4.1-portable.exe](https://github.com/ousheeper/growtree/releases/latest)** — 约 70 MB，单文件便携版
 
 双击即用：免安装、不写注册表，首次启动自解压到临时目录（约 2 秒）。存档在
 `%APPDATA%\desktop-growtree\state.json`，启动日志是同目录的 `boot.log`。

@@ -527,6 +527,14 @@
       return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
     },
 
+    /* 主进程每 0.5 秒播报一次系统光标：窗口被挪动（比如打开插件栏）之后
+     * 也能立刻知道光标还在不在树区里，不依赖 mousemove */
+    applyCursor(p) {
+      if (!p || !Store.state.ui.barsAutoHide) return;
+      const show = !!p.inside && this.inStage(p.x, p.y);
+      document.body.classList.toggle('bars-show', show);
+    },
+
     /* 上下栏自动隐藏开关 */
     applyBarsAuto() {
       const on = !!Store.state.ui.barsAutoHide;
@@ -535,8 +543,9 @@
         document.body.classList.remove('bars-show');
         return;
       }
+      // 启动时先不显示，等主进程把光标位置报过来再决定
       const p = this._lastPt;
-      document.body.classList.toggle('bars-show', !p || this.inStage(p.x, p.y));
+      document.body.classList.toggle('bars-show', !!p && this.inStage(p.x, p.y));
     },
 
     setUiFlag(key, value) {
@@ -965,6 +974,7 @@
           if (b && !this._rzDrag) this.bounds = Object.assign({}, b);
         });
       }
+      if (window.native.onCursor) window.native.onCursor((p) => this.applyCursor(p));
       window.native.onCommand((cmd) => {
         if (!cmd || !cmd.type) return;
         // 全局热键也算一次用户手势，先把音频唤醒

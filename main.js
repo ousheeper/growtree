@@ -552,6 +552,7 @@ function createWindow() {
   win.once('ready-to-show', () => {
     bootLog('[window] ready-to-show');
     win.showInactive();
+    cursorInside = null;
     if (ui.passThrough) setPassThrough(true, false);
   });
 
@@ -584,6 +585,29 @@ function broadcastBoundsSoon() {
 
 
 
+/* ---------------- 光标监视 ---------------- */
+/* 透明窗口在鼠标快速移出时不一定收得到 mouseleave，
+ * 上下栏就会一直停在显示状态。这里用系统光标位置兜底：
+ * 只要光标不在窗口里，就告诉渲染进程把栏收起来。 */
+let cursorTimer = null;
+let cursorInside = null;
+
+function startCursorWatch() {
+  if (cursorTimer) return;
+  cursorTimer = setInterval(() => {
+    if (!win || win.isDestroyed() || !win.isVisible()) return;
+    if (win.webContents.isLoading()) return;
+    const b = win.getBounds();
+    const p = screen.getCursorScreenPoint();
+    const inside = p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height;
+    // 窗口自己也会动（打开插件栏时会向左变宽），所以不能只在 inside 变化时才发：
+    // 光标没动、窗口挪了，也要重新算一次它到底在不在树区里
+    cursorInside = inside;
+    if (win.webContents.isDestroyed()) return;
+    win.webContents.send('cursor', { inside, x: p.x - b.x, y: p.y - b.y });
+  }, 500);
+}
+
 /* ---------------- 穿透 / 显示控制 ---------------- */
 function applyIgnore(on) {
   if (!win || win.isDestroyed()) return;
@@ -606,6 +630,7 @@ function toggleVisible() {
   } else {
     win.showInactive();
     win.focus();
+    cursorInside = null;
   }
 }
 
@@ -836,6 +861,7 @@ if (!gotLock) {
     bootLog('--- app ready');
     app.setAppUserModelId('com.growtree.desktop');
     createWindow();
+    startCursorWatch();
     startKeyWatcher();
     buildTray();
     globalShortcut.register('Ctrl+Alt+T', toggleVisible);

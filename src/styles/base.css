@@ -1557,3 +1557,15 @@ body.wx-snow .rain i {
   100% { transform: translate3d(-10px, 120vh, 0) scale(0.9); opacity: 0; }
 }
 
+/* 上下栏收起来之后，画面在窗口边缘轻轻淡出，避免一刀切的硬边 */
+body.bars-auto:not(.bars-show) .stage {
+  -webkit-mask-image:
+    linear-gradient(180deg, transparent 0, #000 46px, #000 calc(100% - 42px), transparent 100%),
+    linear-gradient(90deg, transparent 0, #000 30px, #000 calc(100% - 30px), transparent 100%);
+  mask-image:
+    linear-gradient(180deg, transparent 0, #000 46px, #000 calc(100% - 42px), transparent 100%),
+    linear-gradient(90deg, transparent 0, #000 30px, #000 calc(100% - 30px), transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+

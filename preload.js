@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('native', {
   importSave: () => ipcRenderer.invoke('saves:import'),
   openSavesDir: () => ipcRenderer.invoke('saves:open'),
   onBounds: (cb) => ipcRenderer.on('bounds', (_e, b) => cb(b)),
+  onCursor: (cb) => ipcRenderer.on('cursor', (_e, p) => cb(p)),
   onKeys: (cb) => ipcRenderer.on('keys', (_e, payload) => cb(payload)),
   listPlugins: () => ipcRenderer.invoke('plugins:list'),
   openPluginsDir: () => ipcRenderer.invoke('plugins:open'),
