@@ -14,6 +14,7 @@
     <svg id="tree" viewBox="0 0 460 800" preserveAspectRatio="xMidYMax meet" aria-hidden="true"></svg>
 
     <div class="clouds" id="clouds" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="season-layer" id="seasonLayer" aria-hidden="true"></div>
 
     <div class="trunk-hit ui-hit" id="trunkHit"></div>
     <div class="rain" id="rain" aria-hidden="true"></div>
@@ -36,6 +37,7 @@
       <button class="chip icon" id="btnHide" title="隐藏到托盘 (Ctrl+Alt+T)">–</button>
     </div>
 
+    <div class="wx ui-hit" id="seasonChip" title="季节"></div>
     <div class="wx ui-hit" id="wxChip" title="天气"></div>
 
     <div class="floats" id="floats"></div>
@@ -47,6 +49,7 @@
         <div class="lv">LV <b id="lvNum">1</b><span class="stagetag" id="stageName">种子</span></div>
         <div class="bar"><i id="xpFill"></i></div>
         <div class="pct" id="pct">0%</div>
+        <span class="wallet" id="wallet" title="金币（在仓库卖收货获得）"><i></i><b id="walletNum">30</b></span>
       </div>
     </div>
 
@@ -101,6 +104,8 @@
 <script src="js/tree.js"></script>
 <script src="js/codex-data.js"></script>
 <script src="js/store.js"></script>
+<script src="js/economy.js"></script>
+<script src="js/season.js"></script>
 <script src="js/achievements.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/host.js"></script>

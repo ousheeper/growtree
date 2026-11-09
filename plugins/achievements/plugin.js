@@ -56,7 +56,11 @@
     moon:
       '<path d="M15.4 3.6a8.2 8.2 0 1 0 4.9 14.7 8.7 8.7 0 0 1-4.9-14.7Z" fill="currentColor"/>',
     hand:
-      '<path d="M6 3.2l11.4 8.2-5.4.8 2.9 6.3-2.4 1.1-2.9-6.3L6 17Z" fill="currentColor"/>'
+      '<path d="M6 3.2l11.4 8.2-5.4.8 2.9 6.3-2.4 1.1-2.9-6.3L6 17Z" fill="currentColor"/>',
+    coin:
+      '<circle cx="12" cy="12" r="8.2" fill="currentColor" opacity=".92"/>' +
+      '<circle cx="12" cy="12" r="5.1" fill="none" stroke="#1a1420" stroke-width="1.4" opacity=".45"/>' +
+      '<path d="M12 7.6v8.8" stroke="#1a1420" stroke-width="1.4" stroke-linecap="round" opacity=".45"/>'
   };
 
   function glyph(name, size) {
@@ -181,7 +185,7 @@
         })
       );
       // 只在「枝条 / 叶片」数量真的变了才重画：太阳挪动会高频触发 tree-stats，
-      // 每 100ms 重建 31 张卡片没必要
+      // 每 100ms 重建 35 张卡片没必要
       offs.push(ctx.on('tree-stats', (st) => {
         treeStats = st || {};
         const sig = [treeStats.branches, treeStats.leaves].join('/');

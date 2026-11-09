@@ -57,6 +57,8 @@
     { id: 'codex_all', cat: 'explore', tier: 3, icon: 'book', name: '全知', desc: '收齐所有图鉴词条', goal: (window.CODEX_ITEMS && window.CODEX_ITEMS.length) || 72, value: (s) => n((s.codex || []).length) },
     { id: 'rain_first', cat: 'explore', tier: 1, icon: 'drop', name: '听雨', desc: '经历第一场雨', goal: 1, value: (s) => n(s.stats.rains) },
     { id: 'rain_ten', cat: 'explore', tier: 2, icon: 'drop', name: '雨中人', desc: '经历 10 场雨', goal: 10, value: (s) => n(s.stats.rains) },
+    { id: 'first_sale', cat: 'harvest', tier: 1, icon: 'basket', name: '第一笔生意', desc: '在仓库卖出第一份收货', goal: 1, value: (s) => n(s.stats.sold) },
+    { id: 'coin_500', cat: 'harvest', tier: 2, icon: 'coin', name: '小有积蓄', desc: '身上持有 500 金币', goal: 500, value: (s) => n(s.coins) },
     { id: 'keys10k', cat: 'explore', tier: 1, icon: 'key', name: '指尖生风', desc: '全机累计敲击 10,000 次', goal: 10000, value: (s) => n(s.stats.keysTotal) },
     { id: 'keys50k', cat: 'explore', tier: 3, icon: 'key', name: '键盘炼金', desc: '全机累计敲击 50,000 次', goal: 50000, value: (s) => n(s.stats.keysTotal) },
     { id: 'palette4', cat: 'explore', tier: 2, icon: 'palette', name: '四色', desc: '四种花色都试过一遍', goal: 4, value: (s) => n((s.stats.palettes || []).length) },
@@ -65,7 +67,9 @@
     /* ---------- 陪伴 ---------- */
     { id: 'day1', cat: 'keep', tier: 1, icon: 'moon', name: '一日', desc: '这棵树活满 1 天', goal: 1, value: (s) => n((Date.now() - (s.bornAt || Date.now())) / DAY) },
     { id: 'day7', cat: 'keep', tier: 2, icon: 'moon', name: '一周', desc: '这棵树活满 7 天', goal: 7, value: (s) => n((Date.now() - (s.bornAt || Date.now())) / DAY) },
-    { id: 'day30', cat: 'keep', tier: 3, icon: 'moon', name: '一月', desc: '这棵树活满 30 天', goal: 30, value: (s) => n((Date.now() - (s.bornAt || Date.now())) / DAY) }
+    { id: 'day30', cat: 'keep', tier: 3, icon: 'moon', name: '一月', desc: '这棵树活满 30 天', goal: 30, value: (s) => n((Date.now() - (s.bornAt || Date.now())) / DAY) },
+    { id: 'season_all', cat: 'keep', tier: 2, icon: 'leaf', name: '四季', desc: '经历春、夏、秋、冬各一次', goal: 4, value: (s) => n((s.stats.seasons || []).length) },
+    { id: 'season_loop', cat: 'keep', tier: 3, icon: 'sun', name: '四季轮转', desc: '经历 16 次换季', goal: 16, value: (s) => n(s.stats.seasonChanges) }
   ];
 
   const MAP = {};

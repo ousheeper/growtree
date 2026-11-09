@@ -529,4 +529,154 @@ input[type='range']::-webkit-slider-thumb {
 .jr-item[data-k='ach'] { border-left-color: var(--gold); color: #ddd0ab; }
 /* 手记里的天气条目 */
 .jr-item[data-k='wx'] { border-left-color: #7fc7ff; color: #a9c4d8; }
+/* 手记里的季节 / 交易条目 */
+.jr-item[data-k='season'] { border-left-color: #ffb46b; color: #e0c8a8; }
+.jr-item[data-k='shop'] { border-left-color: var(--gold); color: #d9cfae; }
+
+/* ============ 仓库 / 商店 ============ */
+.eco { display: flex; flex-direction: column; gap: 10px; }
+.eco-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.eco-title { font-size: 14px; letter-spacing: 3px; font-weight: 500; }
+.eco-coins {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--dim);
+}
+.eco-coins svg { align-self: center; color: var(--gold); }
+.eco-coins b {
+  color: var(--gold);
+  font-size: 18px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.eco-coins small { font-size: 9.5px; letter-spacing: 0.5px; }
+
+.eco-sub { display: flex; flex-wrap: wrap; gap: 5px; }
+.eco-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+.eco-pill b { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.eco-pill.on {
+  color: var(--mint);
+  border-color: rgba(127, 230, 176, 0.32);
+  background: rgba(127, 230, 176, 0.07);
+}
+.eco-pill.on b { color: var(--mint); }
+
+.eco-list { display: flex; flex-direction: column; gap: 6px; }
+.eco-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
+  border: 1px solid var(--line);
+}
+.eco-ico {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tc, var(--violet));
+  background: radial-gradient(circle at 36% 30%, rgba(255, 255, 255, 0.1), rgba(14, 11, 22, 0.9));
+  border: 1px solid rgba(180, 150, 240, 0.22);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.06);
+}
+.eco-body { flex: 1; min-width: 0; }
+.eco-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink);
+  letter-spacing: 0.3px;
+}
+.eco-name small {
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 8.5px;
+  color: var(--dim);
+  letter-spacing: 0.5px;
+}
+.eco-desc { margin-top: 3px; font-size: 10.5px; color: var(--dim); line-height: 1.5; }
+.eco-price {
+  font-size: 11px;
+  color: var(--gold);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.eco-price.bad { color: var(--danger); }
+
+.eco-btn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  transition: 0.16s;
+  white-space: nowrap;
+}
+.eco-btn:hover { color: var(--ink); border-color: var(--line-2); background: rgba(181, 140, 255, 0.1); }
+.eco-btn.primary {
+  color: #1a1420;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.eco-btn.primary:hover { background: #f0d79a; }
+.eco-btn:disabled { opacity: 0.32; cursor: default; }
+.eco-btn:disabled:hover { background: rgba(255, 255, 255, 0.03); border-color: var(--line); }
+
+.eco-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.eco-note { font-size: 10px; color: var(--dim); line-height: 1.7; }
+
+/* ============ 存档 ============ */
+.sv { display: flex; flex-direction: column; gap: 10px; }
+.sv-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sv-head h3 { font-size: 14px; letter-spacing: 3px; font-weight: 500; }
+.sv-auto { font-size: 10px; color: var(--dim); }
+.sv-current {
+  padding: 10px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.sv-current b { color: var(--gold); font-weight: 500; font-variant-numeric: tabular-nums; }
+.sv-list { display: flex; flex-direction: column; gap: 8px; }
+.sv-slot {
+  padding: 10px;
+  border-radius: 11px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+  border: 1px solid var(--line);
+}
+.sv-slot.has { border-color: rgba(181, 140, 255, 0.28); }
+.sv-slot-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.sv-slot-h span { font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.sv-slot-b { margin-top: 4px; font-size: 10.5px; color: var(--dim); line-height: 1.6; }
+.sv-slot-a { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.sv-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.sv-tip { font-size: 10px; color: var(--dim); line-height: 1.7; }
 

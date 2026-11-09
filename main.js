@@ -3,7 +3,7 @@
  * 桌面生长树 —— 主进程
  * 透明无边框窗口 + 状态持久化 + 托盘/热键 + 插件目录
  */
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, Tray, Menu, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
@@ -108,6 +108,7 @@ function stopKeyWatcher() {
 let tray = null;
 let quitting = false;
 let passThrough = false;
+let loadingSave = false; // 读档/导入期间别让旧渲染进程把旧状态写回来
 
 const statePath = () => path.join(app.getPath('userData'), 'state.json');
 
@@ -170,6 +171,85 @@ function writeState(data) {
     console.error('[state] save failed', e);
     return false;
   }
+}
+
+/* ---------------- 手动存档槽 ---------------- */
+const SAVE_SLOTS = 3;
+const saveDir = () => path.join(app.getPath('userData'), 'saves');
+const slotPath = (n) => path.join(saveDir(), 'slot' + n + '.json');
+
+function readJsonFile(p) {
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveMeta(data, mtime) {
+  if (!data || typeof data.level !== 'number' || !data.genes) return null;
+  const stock = data.stock || {};
+  return {
+    level: data.level,
+    coins: typeof data.coins === 'number' ? data.coins : 0,
+    achievements: Object.keys(data.achievements || {}).length,
+    codex: Array.isArray(data.codex) ? data.codex.length : 0,
+    season: (data.season && data.season.id) || null,
+    seed: data.genes.seed,
+    palette: data.genes.palette,
+    stock: Object.keys(stock).reduce((n, k) => n + (Number(stock[k]) || 0), 0),
+    savedAt: mtime || Date.now()
+  };
+}
+
+function listSaves() {
+  const out = [];
+  for (let n = 1; n <= SAVE_SLOTS; n++) {
+    let meta = null;
+    try {
+      const st = fs.statSync(slotPath(n));
+      meta = saveMeta(readJsonFile(slotPath(n)), st.mtimeMs);
+    } catch (e) {
+      meta = null;
+    }
+    out.push({ slot: n, meta });
+  }
+  return out;
+}
+
+/* 读取存档时保留当前窗口/面板/插件布局，避免读一个旧档窗口尺寸对不上 */
+function mergeEnvironment(data) {
+  const cur = readState() || {};
+  const d = Object.assign({}, data);
+  d.ui = Object.assign({}, d.ui || {}, cur.ui || {});
+  d.plugins = Object.assign({}, d.plugins || {}, cur.plugins || {});
+  d.sun = cur.sun || d.sun;
+  d.lastSeen = Date.now();
+  return d;
+}
+
+function backupCurrent() {
+  try {
+    const cur = readState();
+    if (cur) fs.writeFileSync(statePath() + '.bak', JSON.stringify(cur, null, 2), 'utf8');
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function scheduleReload() {
+  if (!win || win.isDestroyed()) {
+    loadingSave = false;
+    return;
+  }
+  const clear = () => {
+    loadingSave = false;
+  };
+  win.webContents.once('did-finish-load', clear);
+  setTimeout(clear, 5000);
+  setTimeout(() => {
+    if (win && !win.isDestroyed()) win.webContents.reload();
+  }, 150);
 }
 
 /* 窗口位置：变化后让渲染进程存一次盘（state:save 会把最新 bounds 合进去） */
@@ -398,7 +478,7 @@ function createWindow() {
         const r = await exec(`(Store.addXp(400), Store.state.level + '/' + Store.state.codex.length)`);
         console.log('[gallery] after xp:', r);
         await wait(1500);
-        for (const id of ['codex', 'genes', 'journal', 'stats', 'achievements', 'pomodoro', '__manager']) {
+        for (const id of ['codex', 'genes', 'journal', 'stats', 'achievements', 'warehouse', 'shop', 'saves', 'pomodoro', '__manager']) {
           await exec(`Host.mount('${id}')`);
           await wait(650);
           await grab(id);
@@ -730,12 +810,106 @@ function toggleVisible() {
 /* ---------------- IPC ---------------- */
 ipcMain.handle('state:load', () => readState());
 ipcMain.handle('state:save', (_e, data) => {
+  if (loadingSave) return false;
   // 窗口位置由主进程说了算：渲染进程存盘时把最新的 bounds 合进去，
   // 否则每次 Store.save() 都会把 moved 事件记下的位置冲掉。
   if (data && typeof data === 'object' && win && !win.isDestroyed()) {
     data.ui = Object.assign({}, data.ui, { bounds: win.getBounds() });
   }
   return writeState(data);
+});
+
+/* ---------------- 存档槽 IPC ---------------- */
+ipcMain.handle('saves:list', () => listSaves());
+
+ipcMain.handle('saves:save', (_e, n, data) => {
+  const slot = Number(n);
+  if (!(slot >= 1 && slot <= SAVE_SLOTS)) return { ok: false, msg: '槽位不对' };
+  if (!saveMeta(data)) return { ok: false, msg: '没有可保存的进度' };
+  try {
+    fs.mkdirSync(saveDir(), { recursive: true });
+    const tmp = slotPath(slot) + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tmp, slotPath(slot));
+    return { ok: true, meta: saveMeta(data, Date.now()) };
+  } catch (e) {
+    console.error('[saves] save failed', e);
+    return { ok: false, msg: '写入失败' };
+  }
+});
+
+ipcMain.handle('saves:load', (_e, n) => {
+  const slot = Number(n);
+  if (!(slot >= 1 && slot <= SAVE_SLOTS)) return { ok: false, msg: '槽位不对' };
+  const data = readJsonFile(slotPath(slot));
+  if (!saveMeta(data)) return { ok: false, msg: '这个槽位还是空的' };
+  loadingSave = true;
+  backupCurrent();
+  if (!writeState(mergeEnvironment(data))) {
+    loadingSave = false;
+    return { ok: false, msg: '写入失败' };
+  }
+  scheduleReload();
+  return { ok: true };
+});
+
+ipcMain.handle('saves:delete', (_e, n) => {
+  const slot = Number(n);
+  if (!(slot >= 1 && slot <= SAVE_SLOTS)) return { ok: false, msg: '槽位不对' };
+  try {
+    fs.unlinkSync(slotPath(slot));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, msg: '删除失败' };
+  }
+});
+
+ipcMain.handle('saves:export', async (_e, data) => {
+  if (!saveMeta(data)) return { ok: false, msg: '没有可导出的进度' };
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+  const r = await dialog.showSaveDialog(win, {
+    title: '导出 GrowTree 存档',
+    defaultPath: path.join(app.getPath('documents'), 'GrowTree-' + stamp + '.json'),
+    filters: [{ name: 'GrowTree 存档', extensions: ['json'] }]
+  });
+  if (r.canceled || !r.filePath) return { ok: false, msg: '已取消' };
+  try {
+    fs.writeFileSync(r.filePath, JSON.stringify(data, null, 2), 'utf8');
+    return { ok: true, path: r.filePath };
+  } catch (e) {
+    return { ok: false, msg: '写入失败' };
+  }
+});
+
+ipcMain.handle('saves:import', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: '导入 GrowTree 存档',
+    properties: ['openFile'],
+    filters: [{ name: 'GrowTree 存档', extensions: ['json'] }]
+  });
+  if (r.canceled || !r.filePaths || !r.filePaths[0]) return { ok: false, msg: '已取消' };
+  try {
+    const st = fs.statSync(r.filePaths[0]);
+    if (st.size > 10 * 1024 * 1024) return { ok: false, msg: '文件太大，不像存档' };
+    const data = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
+    if (!saveMeta(data)) return { ok: false, msg: '不是有效的 GrowTree 存档' };
+    loadingSave = true;
+    backupCurrent();
+    if (!writeState(mergeEnvironment(data))) {
+      loadingSave = false;
+      return { ok: false, msg: '写入失败' };
+    }
+    scheduleReload();
+    return { ok: true, path: r.filePaths[0] };
+  } catch (e) {
+    return { ok: false, msg: '读取失败' };
+  }
+});
+
+ipcMain.handle('saves:open', async () => {
+  fs.mkdirSync(saveDir(), { recursive: true });
+  await shell.openPath(saveDir());
+  return true;
 });
 
 /* 渲染进程拿当前窗口矩形 + 工作区，自己算缩放/面板要多大 */

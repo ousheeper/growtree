@@ -56,6 +56,7 @@
       await this.initGeom();
       this.applyUiFlags();
       if (window.Weather) Weather.init();
+      if (window.Season) Season.init();
       this._booted = true;
       if (window.native && window.native.onKeys) window.native.onKeys((p) => this.onKeys(p));
       this.mountInitial();
@@ -140,9 +141,13 @@
 
     buildParams(extra) {
       const st = Store.state;
+      // 催花剂只在生成参数里临时加挂果率，不改用户自己的基因
+      const genes = Object.assign({}, st.genes);
+      const bloom = Store.bloomBonus ? Store.bloomBonus() : 0;
+      if (bloom) genes.decoRate = Math.round(Math.min(1.7, (genes.decoRate || 0.62) + bloom) * 100) / 100;
       return Object.assign(
         {},
-        st.genes,
+        genes,
         {
           sunTilt: this.sunTiltNow(),
           tiltMap: st.branchTilt || {},
@@ -240,6 +245,8 @@
       $('#xpFill').style.width = p.toFixed(1) + '%';
       $('#xpFill').classList.toggle('near', p >= 88);
       $('#pct').textContent = Math.floor(p) + '%';
+      const wallet = document.getElementById('walletNum');
+      if (wallet) wallet.textContent = Number(s.coins || 0).toLocaleString('zh-CN');
     },
 
     /* ---------- 模式：浇水 / 修剪 / 收获 ---------- */
@@ -386,6 +393,7 @@
         setTimeout(() => window.Fx && window.Fx.pick(pt.x, pt.y, spark), i * 70);
       });
       Store.addHarvest(counts);
+      Store.addStock(counts);
       s.nutrient += n;
       Store.addXp(n * 3, 'harvest');
       this.renderTree(false);
@@ -393,7 +401,7 @@
       const parts = Object.keys(counts)
         .map((k) => ({ flower: '花', fruit: '果', mushroom: '菌', crystal: '晶' })[k] + ' ' + counts[k])
         .join(' · ');
-      this.toast(`收获 ${n} 份 · ${parts} · 养分 +${n}`);
+      this.toast(`收获 ${n} 份 · ${parts} · 入库 +${n} · 养分 +${n}`);
       Store.log(`收下 ${n} 份（${parts}），枝头轻了一些。`, 'feed');
       this.checkAchievements();
       return n;
@@ -789,6 +797,15 @@
       document.querySelectorAll('.rz').forEach((h) => {
         h.addEventListener('pointerdown', (e) => this.startResize(e, h.dataset.edge));
       });
+      // 兜底：拖到窗口外松手 / alt-tab / 鼠标离开时，别把 rz-on 留在身上
+      window.addEventListener('blur', () => this.endResize());
+      document.addEventListener('mouseleave', () => {
+        if (this._rz) this.endResize();
+        else document.body.classList.remove('rz-on');
+      });
+      document.addEventListener('mousemove', () => {
+        if (!this._rz && document.body.classList.contains('rz-on')) document.body.classList.remove('rz-on');
+      });
     },
 
     startResize(e, edge) {
@@ -811,13 +828,23 @@
       };
       this._rzDrag = true;
       document.body.classList.add('rz-on');
-      const move = (ev) => this.onResizeMove(ev);
+      const move = (ev) => {
+        // 在窗口外松开鼠标时，pointerup 可能收不到；buttons=0 就当作结束
+        if (ev.buttons === 0) {
+          this.endResize();
+          return;
+        }
+        this.onResizeMove(ev);
+      };
       const up = () => this.endResize();
+      const lost = () => this.endResize();
       this._rz.move = move;
       this._rz.up = up;
+      this._rz.lost = lost;
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
       window.addEventListener('pointercancel', up);
+      window.addEventListener('lostpointercapture', lost, true);
     },
 
     onResizeMove(ev) {
@@ -870,6 +897,7 @@
       window.removeEventListener('pointermove', s.move);
       window.removeEventListener('pointerup', s.up);
       window.removeEventListener('pointercancel', s.up);
+      if (s.lost) window.removeEventListener('lostpointercapture', s.lost, true);
       this._rz = null;
       this._rzDrag = false;
       document.body.classList.remove('rz-on');
@@ -1036,6 +1064,7 @@
         this.updateBar();
         this.renderDock();
       });
+      Bus.on('economy', () => this.updateBar());
     },
 
     bindNative() {
@@ -1084,6 +1113,14 @@
         this.updateSoil();
         if (++sec % 2 === 0) this.checkAchievements();
         if (sec % 5 === 0 && window.Weather) Weather.tick();
+        if (sec % 5 === 0 && window.Season) Season.tick();
+        // 催花剂过期：把多出来的花果收回去
+        const bloom = Store.bloomActive ? Store.bloomActive() : false;
+        if (this._bloom === undefined) this._bloom = bloom;
+        else if (this._bloom !== bloom) {
+          this._bloom = bloom;
+          if (!bloom) this.renderTree(true);
+        }
         // 摘掉的花果到时间了会长回来，隔 45 秒查一次，有变化才重绘
         if (sec % 45 === 0 && Store.state.picked.length) {
           const before = Store.state.picked.length;

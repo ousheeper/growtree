@@ -202,6 +202,25 @@
       this.tone(1200, 0.03, { gain: 0.009, type: 'sine' });
     },
 
+    /* 卖东西：两声很轻的金属音 */
+    coin() {
+      this.tone(1046.5, 0.18, { gain: 0.03, type: 'triangle' });
+      this.tone(1568, 0.22, { gain: 0.022, type: 'triangle', delay: 0.06 });
+    },
+
+    /* 买东西：一声低音 + 一声确认 */
+    buy() {
+      this.tone(330, 0.12, { to: 240, gain: 0.028, type: 'sine' });
+      this.tone(1046.5, 0.12, { gain: 0.018, type: 'triangle', delay: 0.09 });
+    },
+
+    /* 换季：三音小铃，比升级更轻 */
+    season() {
+      [440, 554.37, 659.25].forEach((f, i) => {
+        this.tone(f, 0.7, { delay: i * 0.09, gain: 0.024, type: 'sine' });
+      });
+    },
+
     droplet() {
       this.tone(1100 + Math.random() * 500, 0.09, { to: 520, gain: 0.01, type: 'sine' });
     },

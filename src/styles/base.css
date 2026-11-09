@@ -392,6 +392,24 @@ body.mode-harvest .fab { display: inline-flex; }
   transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .levelbar .pct { font-size: 11px; color: var(--muted); width: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+.levelbar .wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  font-size: 10.5px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.levelbar .wallet i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 6px rgba(230, 198, 132, 0.65);
+}
+.levelbar .wallet b { font-weight: 500; font-variant-numeric: tabular-nums; }
 
 /* ============ 拖边缩放 ============ */
 /* 贴着窗口边缘的 7px 热区：移到边上亮一条线，按住就能拖着改大小 */
@@ -443,7 +461,9 @@ body.mode-harvest .fab { display: inline-flex; }
   top: 4px;
   background: radial-gradient(circle, rgba(206, 178, 255, 0.95), rgba(181, 140, 255, 0) 70%);
 }
-.rz:hover::after { opacity: 1; }
+/* 只在实际拖动时画线。透明窗口边缘的 :hover 有时会被系统锁住，
+ * 鼠标离开后还留一条紫线，看起来像多了一圈边框。 */
+.rz:hover::after { opacity: 0; }
 body.rz-on .rz::after { opacity: 1; }
 
 /* ============ 浮动反馈 ============ */
@@ -1381,4 +1401,59 @@ body.wx-rain .wx { color: #9fc7e8; border-color: rgba(127, 199, 255, 0.3); }
 
 /* 上下栏自动隐藏时，天气角标也一起收起来 */
 body.bars-auto:not(.bars-show) .wx { opacity: 0; pointer-events: none; }
+
+/* ================= 季节 ================= */
+.season-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 74px;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 2s ease;
+}
+body.season-spring .season-layer,
+body.season-summer .season-layer,
+body.season-autumn .season-layer,
+body.season-winter .season-layer { opacity: 0.55; }
+
+.season-layer i {
+  position: absolute;
+  top: -8%;
+  left: var(--x);
+  width: var(--s);
+  height: var(--s);
+  opacity: 0.75;
+  animation: seasonFall var(--d) linear var(--delay) infinite;
+}
+body.season-spring .season-layer i { background: #ffc2d8; border-radius: 60% 20% 60% 20%; }
+body.season-autumn .season-layer i { background: #e08a4a; border-radius: 60% 20% 60% 20%; }
+body.season-winter .season-layer i { background: #eaf6ff; border-radius: 50%; box-shadow: 0 0 4px rgba(220, 240, 255, 0.6); }
+body.season-summer .season-layer i {
+  top: 58%;
+  background: #ffe6a8;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #ffe6a8;
+  animation-name: seasonFloat;
+}
+@keyframes seasonFall {
+  0% { transform: translate3d(0, -10%, 0) rotate(var(--r)); }
+  100% { transform: translate3d(42px, 115vh, 0) rotate(calc(var(--r) + 240deg)); }
+}
+@keyframes seasonFloat {
+  0% { opacity: 0; transform: translateY(20px) scale(0.8); }
+  40% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(-90px) scale(1.05); }
+}
+
+/* 季节角标在天气角标上面 */
+.wx#seasonChip { top: 50px; }
+.wx#wxChip { top: 78px; }
+body.season-spring #seasonChip { color: #ffb7d0; border-color: rgba(255, 183, 208, 0.3); }
+body.season-summer #seasonChip { color: #ffd27a; border-color: rgba(255, 210, 122, 0.28); }
+body.season-autumn #seasonChip { color: #ffb46b; border-color: rgba(255, 180, 107, 0.3); }
+body.season-winter #seasonChip { color: #bfe6ff; border-color: rgba(191, 230, 255, 0.3); }
 

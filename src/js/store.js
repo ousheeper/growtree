@@ -88,7 +88,11 @@
         codex: [],
         journal: [],
         achievements: {},
-        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0, soaked: 0, bigHarvest: 0, palettes: [], rains: 0 },
+        coins: 30,
+        stock: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 },
+        buffs: { moistUntil: 0, bloomUntil: 0, lucky: false },
+        season: null,
+        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0, soaked: 0, bigHarvest: 0, palettes: [], rains: 0, sold: 0, coinsEarned: 0, coinsSpent: 0, purchases: 0, seasons: [], seasonChanges: 0 },
         weather: null,
         plugins: { enabled: null, order: null, active: 'codex', known: [] },
         ui: { panelOpen: true, alwaysOnTop: true, overlay: false, passThrough: false, scale: 1, stageH: 940, mode: 'water', barsAutoHide: false, soundOn: true, soundVolume: 0.5 }
@@ -109,6 +113,10 @@
       if (!Array.isArray(s.journal)) s.journal = [];
       if (!s.achievements || typeof s.achievements !== 'object') s.achievements = {};
       if (!Array.isArray(s.stats.palettes)) s.stats.palettes = [];
+      if (!Array.isArray(s.stats.seasons)) s.stats.seasons = [];
+      if (typeof s.coins !== 'number' || !isFinite(s.coins)) s.coins = 30;
+      s.stock = Object.assign({ flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, s.stock || {});
+      s.buffs = Object.assign({ moistUntil: 0, bloomUntil: 0, lucky: false }, s.buffs || {});
       if (!Array.isArray(s.pruned)) s.pruned = [];
       // 自愈：主干（'r' 或不含层级的路径）不能剪，历史存档里若有就丢掉，否则整棵树是空的
       s.pruned = s.pruned.filter((x) => typeof x === 'string' && x.indexOf('.') > 0);
@@ -198,7 +206,9 @@
         const w = window.Weather && window.Weather.current ? window.Weather.current() : null;
         const dry = w ? w.dry : 1;
         const wet = w ? w.wet : 0;
-        s.soil = Math.max(0, Math.min(SOIL_MAX, s.soil + (wet - SOIL_DRY * dry) * (dt / 1000)));
+        const seasonDry = window.Season ? window.Season.dryMul() : 1;
+        const moist = this.moistActive ? (this.moistActive() ? 0.5 : 1) : 1;
+        s.soil = Math.max(0, Math.min(SOIL_MAX, s.soil + (wet - SOIL_DRY * dry * seasonDry * moist) * (dt / 1000)));
       }
       this.tickAcc = (this.tickAcc || 0) + dt;
       while (this.tickAcc >= TICK_MS) {
@@ -270,13 +280,21 @@
       const s = this.state;
       const locked = (window.CODEX_ITEMS || []).filter((it) => !s.codex.includes(it.id));
       if (!locked.length) return null;
-      // 稀有度越高越难出
-      const pool = [];
-      locked.forEach((it) => {
-        const w = Math.max(1, 6 - it.rarity);
-        for (let i = 0; i < w; i++) pool.push(it);
-      });
-      const pick = pool[(Math.random() * pool.length) | 0];
+      let pick = null;
+      // 幸运露：下一次升级直接从还没收录的里面挑
+      if (s.buffs && s.buffs.lucky) {
+        s.buffs.lucky = false;
+        pick = locked[(Math.random() * locked.length) | 0];
+      }
+      if (!pick) {
+        // 稀有度越高越难出
+        const pool = [];
+        locked.forEach((it) => {
+          const w = Math.max(1, 6 - it.rarity);
+          for (let i = 0; i < w; i++) pool.push(it);
+        });
+        pick = pool[(Math.random() * pool.length) | 0];
+      }
       s.codex.push(pick.id);
       this.log(`图鉴解锁：${pick.name}（${window.CODEX_RARITY[pick.rarity]}）—— ${pick.desc}`, 'codex');
       emit('codex', pick);
@@ -322,6 +340,116 @@
       if (s.journal.length > 240) s.journal.length = 240;
       emit('journal', s.journal[0]);
       this.saveSoon();
+    },
+
+    /* ---------- 仓库 / 金币 ---------- */
+    stockTotal() {
+      const st = this.state && this.state.stock;
+      return ['flower', 'fruit', 'mushroom', 'crystal'].reduce((n, k) => n + ((st && st[k]) || 0), 0);
+    },
+
+    addStock(counts) {
+      const s = this.state;
+      if (!s || !counts) return 0;
+      let n = 0;
+      ['flower', 'fruit', 'mushroom', 'crystal'].forEach((k) => {
+        const v = counts[k] || 0;
+        if (v > 0) {
+          s.stock[k] = (s.stock[k] || 0) + v;
+          n += v;
+        }
+      });
+      if (n) {
+        this.saveSoon();
+        Bus.emit('economy', { type: 'stock', n });
+      }
+      return n;
+    },
+
+    sellType(id) {
+      const s = this.state;
+      if (!s || !s.stock) return null;
+      const n = s.stock[id] || 0;
+      if (!n) return null;
+      const sid = window.Season ? Season.current().id : null;
+      const unit = window.Economy ? Economy.priceOf(id, sid) : 1;
+      const coins = unit * n;
+      s.stock[id] = 0;
+      s.coins += coins;
+      s.stats.sold = (s.stats.sold || 0) + n;
+      s.stats.coinsEarned = (s.stats.coinsEarned || 0) + coins;
+      const name = window.Economy ? (Economy.type(id) || {}).name || id : id;
+      this.log(`卖出 ${n} 份${name}，得 ${coins} 金币。`, 'shop');
+      this.saveSoon();
+      Bus.emit('economy', { type: 'sell', id, n, coins });
+      return { n, coins };
+    },
+
+    sellAll() {
+      const s = this.state;
+      if (!s || !s.stock) return null;
+      let n = 0;
+      let coins = 0;
+      ['flower', 'fruit', 'mushroom', 'crystal'].forEach((id) => {
+        const c = s.stock[id] || 0;
+        if (!c) return;
+        const sid = window.Season ? Season.current().id : null;
+        coins += c * (window.Economy ? Economy.priceOf(id, sid) : 1);
+        n += c;
+        s.stock[id] = 0;
+      });
+      if (!n) return null;
+      s.coins += coins;
+      s.stats.sold = (s.stats.sold || 0) + n;
+      s.stats.coinsEarned = (s.stats.coinsEarned || 0) + coins;
+      this.log(`把仓库里的 ${n} 份全部卖出，得 ${coins} 金币。`, 'shop');
+      this.saveSoon();
+      Bus.emit('economy', { type: 'sell', n, coins });
+      return { n, coins };
+    },
+
+    buy(id) {
+      const s = this.state;
+      const item = window.Economy && Economy.SHOP.find((x) => x.id === id);
+      if (!item) return { ok: false, reason: 'item' };
+      if ((s.coins || 0) < item.price) return { ok: false, reason: 'coins' };
+      const now = Date.now();
+      s.coins -= item.price;
+      if (id === 'fertilizer') {
+        this.addXp(80, 'shop');
+      } else if (id === 'moist') {
+        s.soil = 100;
+        s.buffs.moistUntil = Math.max(now, s.buffs.moistUntil || 0) + 30 * 60000;
+      } else if (id === 'bloom') {
+        s.buffs.bloomUntil = Math.max(now, s.buffs.bloomUntil || 0) + 20 * 60000;
+      } else if (id === 'lucky') {
+        s.buffs.lucky = true;
+      }
+      s.stats.purchases = (s.stats.purchases || 0) + 1;
+      s.stats.coinsSpent = (s.stats.coinsSpent || 0) + item.price;
+      this.log(`买下「${item.name}」，花了 ${item.price} 金币。`, 'shop');
+      this.saveSoon();
+      Bus.emit('economy', { type: 'buy', id, price: item.price });
+      return { ok: true, item };
+    },
+
+    moistActive() {
+      const s = this.state;
+      return !!s && !!s.buffs && Date.now() < (s.buffs.moistUntil || 0);
+    },
+
+    bloomActive() {
+      const s = this.state;
+      return !!s && !!s.buffs && Date.now() < (s.buffs.bloomUntil || 0);
+    },
+
+    bloomBonus() {
+      return this.bloomActive() ? 0.2 : 0;
+    },
+
+    luckyActive() {
+      const s = this.state;
+      return !!s && !!s.buffs && !!s.buffs.lucky;
     },
 
     addHarvest(species) {

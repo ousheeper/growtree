@@ -14,6 +14,15 @@ contextBridge.exposeInMainWorld('native', {
   setSunTop: (on) => ipcRenderer.invoke('sun:top', on),
   setSunSize: (px) => ipcRenderer.invoke('sun:size', px),
   setSunDim: (v) => ipcRenderer.invoke('sun:dim', v),
+
+  // 存档槽
+  listSaves: () => ipcRenderer.invoke('saves:list'),
+  saveSlot: (n, data) => ipcRenderer.invoke('saves:save', n, data),
+  loadSlot: (n) => ipcRenderer.invoke('saves:load', n),
+  deleteSlot: (n) => ipcRenderer.invoke('saves:delete', n),
+  exportSave: (data) => ipcRenderer.invoke('saves:export', data),
+  importSave: () => ipcRenderer.invoke('saves:import'),
+  openSavesDir: () => ipcRenderer.invoke('saves:open'),
   placeSun: (x, y) => ipcRenderer.invoke('sun:place', { x, y }),
   onSun: (cb) => ipcRenderer.on('sun', (_e, payload) => cb(payload)),
   onBounds: (cb) => ipcRenderer.on('bounds', (_e, b) => cb(b)),
