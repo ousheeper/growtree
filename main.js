@@ -687,6 +687,14 @@ function setSunSize(px) {
 ipcMain.handle('sun:size', (_e, px) => setSunSize(px));
 ipcMain.handle('sun:size:get', () => sunSize);
 
+/* 天气：阴天/雨天把太阳压暗一点，和舞台上的云对得上 */
+ipcMain.handle('sun:dim', (_e, v) => {
+  if (!sunWin || sunWin.isDestroyed()) return false;
+  const op = clamp(Number(v) || 0, 0, 1);
+  sunWin.setOpacity(op);
+  return op;
+});
+
 ipcMain.handle('sun:top', (_e, on) => {
   if (sunWin && !sunWin.isDestroyed()) sunWin.setAlwaysOnTop(!!on, 'floating');
   return !!on;

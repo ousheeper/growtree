@@ -65,6 +65,8 @@
           card('土壤湿度', Math.round(s.soil || 0) + '<small>%</small>'),
           card('湿润加成', (Store.soilBonus ? '+' + Store.soilBonus(s.soil) : '+0') + '<small>/4s</small>'),
           card('浇透次数', s.stats.soaked || 0),
+          card('当前天气', (window.Weather ? window.Weather.current().name : '晴') + '<small> · ' + (window.Weather && window.Weather.current().id === 'rain' ? '回润' : '干燥') + '</small>'),
+          card('经历降雨', s.stats.rains || 0),
           card('今日敲击', (s.stats.keysToday || 0).toLocaleString()),
           card('累计敲击', (s.stats.keysTotal || 0).toLocaleString()),
           card('敲击换养分', s.stats.keyNut || 0),
@@ -111,6 +113,7 @@
       offs.push(ctx.on('levelup', render));
       offs.push(ctx.on('codex', render));
       offs.push(ctx.on('achievement', render));
+      offs.push(ctx.on('weather', render));
       const timer = setInterval(render, 20000);
 
       return {

@@ -83,6 +83,19 @@
           </div>
 
           <div class="gen-group">
+            <div class="gen-gt">声音</div>
+            <label class="gen-toggle" style="margin-top:0">
+              <span class="lb"><span>音效</span><small>浇水、修剪、收获、升级的轻音</small></span>
+              <span class="switch"><input type="checkbox" id="gSound" ${ctx.state.ui.soundOn !== false ? 'checked' : ''}><i></i></span>
+            </label>
+            <div class="gen-row">
+              <div class="lb"><span>音量</span><b id="lb-vol"></b></div>
+              <input type="range" id="gVol" min="0" max="100" step="5" value="${Math.round((ctx.state.ui.soundVolume == null ? 0.5 : ctx.state.ui.soundVolume) * 100)}">
+            </div>
+            <div class="hint-line">下雨时会有很轻的雨声；关掉后完全静音</div>
+          </div>
+
+          <div class="gen-group">
             <div class="gen-gt">花色</div>
             <div class="palettes" id="gPal"></div>
           </div>
@@ -169,6 +182,18 @@
         sunInput.value = v;
         syncSun();
       });
+
+      /* 声音 */
+      const sndCb = root.querySelector('#gSound');
+      const volInput = root.querySelector('#gVol');
+      const volLb = root.querySelector('#lb-vol');
+      const syncVol = () => (volLb.textContent = volInput.value + '%');
+      syncVol();
+      sndCb.onchange = () => ctx.uiFlag('soundOn', sndCb.checked);
+      volInput.oninput = () => {
+        syncVol();
+        ctx.uiFlag('soundVolume', Number(volInput.value) / 100);
+      };
 
       /* 上下栏自动隐藏 */
       const barsCb = root.querySelector('#gBars');

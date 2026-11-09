@@ -55,6 +55,8 @@
     { id: 'codex12', cat: 'explore', tier: 1, icon: 'book', name: '拾遗', desc: '收录 12 条图鉴词条', goal: 12, value: (s) => n((s.codex || []).length) },
     { id: 'codex40', cat: 'explore', tier: 2, icon: 'book', name: '博识', desc: '收录 40 条图鉴词条', goal: 40, value: (s) => n((s.codex || []).length) },
     { id: 'codex_all', cat: 'explore', tier: 3, icon: 'book', name: '全知', desc: '收齐所有图鉴词条', goal: (window.CODEX_ITEMS && window.CODEX_ITEMS.length) || 72, value: (s) => n((s.codex || []).length) },
+    { id: 'rain_first', cat: 'explore', tier: 1, icon: 'drop', name: '听雨', desc: '经历第一场雨', goal: 1, value: (s) => n(s.stats.rains) },
+    { id: 'rain_ten', cat: 'explore', tier: 2, icon: 'drop', name: '雨中人', desc: '经历 10 场雨', goal: 10, value: (s) => n(s.stats.rains) },
     { id: 'keys10k', cat: 'explore', tier: 1, icon: 'key', name: '指尖生风', desc: '全机累计敲击 10,000 次', goal: 10000, value: (s) => n(s.stats.keysTotal) },
     { id: 'keys50k', cat: 'explore', tier: 3, icon: 'key', name: '键盘炼金', desc: '全机累计敲击 50,000 次', goal: 50000, value: (s) => n(s.stats.keysTotal) },
     { id: 'palette4', cat: 'explore', tier: 2, icon: 'palette', name: '四色', desc: '四种花色都试过一遍', goal: 4, value: (s) => n((s.stats.palettes || []).length) },

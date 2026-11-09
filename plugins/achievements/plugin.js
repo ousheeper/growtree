@@ -181,7 +181,7 @@
         })
       );
       // 只在「枝条 / 叶片」数量真的变了才重画：太阳挪动会高频触发 tree-stats，
-      // 每 100ms 重建 29 张卡片没必要
+      // 每 100ms 重建 31 张卡片没必要
       offs.push(ctx.on('tree-stats', (st) => {
         treeStats = st || {};
         const sig = [treeStats.branches, treeStats.leaves].join('/');

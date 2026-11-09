@@ -1282,3 +1282,103 @@ body.mode-poke .stage { cursor: url("data:image/svg+xml,<svg xmlns='http://www.w
 .chip:active, .mode:active, .tab:active { transform: scale(0.96); }
 .btn:active { transform: translateY(1px); }
 
+/* ================= 天气 ================= */
+
+/* 云层：在树后面，只有阴天/雨天显形 */
+.clouds {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 74px;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 2.2s ease;
+}
+body.wx-cloudy .clouds { opacity: 0.55; }
+body.wx-rain .clouds { opacity: 0.85; }
+.clouds i {
+  position: absolute;
+  width: 320px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 55%, rgba(152, 144, 182, 0.17), rgba(152, 144, 182, 0) 70%);
+  filter: blur(18px);
+  animation: cloudDrift linear infinite alternate;
+  animation-play-state: paused;
+}
+body.wx-cloudy .clouds i,
+body.wx-rain .clouds i { animation-play-state: running; }
+.clouds i:nth-child(1) { left: -16%; top: 2%; animation-duration: 86s; }
+.clouds i:nth-child(2) { right: -18%; top: 16%; width: 280px; height: 100px; animation-duration: 112s; animation-delay: -30s; }
+.clouds i:nth-child(3) { left: 24%; top: -6%; width: 360px; height: 130px; animation-duration: 98s; animation-delay: -60s; }
+@keyframes cloudDrift {
+  from { transform: translateX(-6%); }
+  to { transform: translateX(8%); }
+}
+
+/* 雨丝：在树前面、UI 后面；只画很细的线，不挡点击 */
+.rain {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 74px;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+body.wx-rain .rain { opacity: 0.62; }
+.rain i {
+  position: absolute;
+  top: -14%;
+  left: var(--x);
+  width: 1px;
+  height: var(--len);
+  border-radius: 1px;
+  opacity: var(--o);
+  background: linear-gradient(180deg, rgba(198, 228, 255, 0), rgba(198, 228, 255, 0.55));
+  animation: rainFall var(--d) linear var(--delay) infinite;
+  animation-play-state: paused;
+}
+body.wx-rain .rain i,
+body.rain-fading .rain i { animation-play-state: running; }
+@keyframes rainFall {
+  0% { transform: translate3d(0, -18%, 0); }
+  100% { transform: translate3d(-30px, 118vh, 0); }
+}
+
+/* 天气角标 */
+.wx {
+  position: absolute;
+  top: 50px;
+  right: 12px;
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  background: rgba(12, 10, 18, 0.5);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  opacity: 0.68;
+  transition: 0.2s;
+}
+.wx:hover { opacity: 1; border-color: var(--line-2); }
+.wx .wx-ico { display: flex; }
+body.wx-sunny .wx { color: var(--gold); border-color: rgba(230, 198, 132, 0.24); }
+body.wx-cloudy .wx { color: #b9b4c9; }
+body.wx-rain .wx { color: #9fc7e8; border-color: rgba(127, 199, 255, 0.3); }
+
+/* 上下栏自动隐藏时，天气角标也一起收起来 */
+body.bars-auto:not(.bars-show) .wx { opacity: 0; pointer-events: none; }
+

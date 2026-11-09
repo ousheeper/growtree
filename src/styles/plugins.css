@@ -527,4 +527,6 @@ input[type='range']::-webkit-slider-thumb {
 
 /* 手记里的成就条目 */
 .jr-item[data-k='ach'] { border-left-color: var(--gold); color: #ddd0ab; }
+/* 手记里的天气条目 */
+.jr-item[data-k='wx'] { border-left-color: #7fc7ff; color: #a9c4d8; }
 

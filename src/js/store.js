@@ -88,9 +88,10 @@
         codex: [],
         journal: [],
         achievements: {},
-        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0, soaked: 0, bigHarvest: 0, palettes: [] },
+        stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0, soaked: 0, bigHarvest: 0, palettes: [], rains: 0 },
+        weather: null,
         plugins: { enabled: null, order: null, active: 'codex', known: [] },
-        ui: { panelOpen: true, alwaysOnTop: true, overlay: false, passThrough: false, scale: 1, stageH: 940, mode: 'water', barsAutoHide: false }
+        ui: { panelOpen: true, alwaysOnTop: true, overlay: false, passThrough: false, scale: 1, stageH: 940, mode: 'water', barsAutoHide: false, soundOn: true, soundVolume: 0.5 }
       };
     },
 
@@ -192,7 +193,13 @@
     tick(dt) {
       const s = this.state;
       if (!s) return;
-      if (typeof s.soil === 'number') s.soil = Math.max(0, s.soil - (dt / 1000) * SOIL_DRY);
+      if (typeof s.soil === 'number') {
+        // 天气决定干湿：晴天干得快，阴天慢，小雨会自己回润
+        const w = window.Weather && window.Weather.current ? window.Weather.current() : null;
+        const dry = w ? w.dry : 1;
+        const wet = w ? w.wet : 0;
+        s.soil = Math.max(0, Math.min(SOIL_MAX, s.soil + (wet - SOIL_DRY * dry) * (dt / 1000)));
+      }
       this.tickAcc = (this.tickAcc || 0) + dt;
       while (this.tickAcc >= TICK_MS) {
         this.tickAcc -= TICK_MS;

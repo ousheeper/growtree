@@ -13,7 +13,10 @@
   <div class="stage" id="stage">
     <svg id="tree" viewBox="0 0 460 800" preserveAspectRatio="xMidYMax meet" aria-hidden="true"></svg>
 
+    <div class="clouds" id="clouds" aria-hidden="true"><i></i><i></i><i></i></div>
+
     <div class="trunk-hit ui-hit" id="trunkHit"></div>
+    <div class="rain" id="rain" aria-hidden="true"></div>
 
     <div class="topbar ui-hit" id="topbar">
       <span class="grip" title="按住这里移动窗口">⣿</span>
@@ -32,6 +35,8 @@
       <button class="chip" id="btnThrough" title="鼠标穿透，点不到任何东西 (Ctrl+Alt+L 恢复)">穿 透</button>
       <button class="chip icon" id="btnHide" title="隐藏到托盘 (Ctrl+Alt+T)">–</button>
     </div>
+
+    <div class="wx ui-hit" id="wxChip" title="天气"></div>
 
     <div class="floats" id="floats"></div>
     <div class="fx" id="fx"></div>
@@ -99,6 +104,8 @@
 <script src="js/achievements.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/host.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/weather.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

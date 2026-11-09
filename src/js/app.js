@@ -37,6 +37,9 @@
     async boot() {
       await Store.init();
       const ui = Store.state.ui;
+      if (window.Sound) {
+        Sound.init({ enabled: ui.soundOn !== false, volume: ui.soundVolume == null ? 0.5 : ui.soundVolume });
+      }
       this.panelOpen = ui.panelOpen !== false;
       this.panelShown = this.panelOpen;
       this.z = clamp(Number(ui.scale) || 1, Z_MIN, Z_MAX);
@@ -52,6 +55,7 @@
       this.bindNative();
       await this.initGeom();
       this.applyUiFlags();
+      if (window.Weather) Weather.init();
       this._booted = true;
       if (window.native && window.native.onKeys) window.native.onKeys((p) => this.onKeys(p));
       this.mountInitial();
@@ -297,6 +301,7 @@
       Store.addXp(3, 'prune');
       this.renderTree(true);
       this.sparks(x, y, 12);
+      if (window.Sound) Sound.snip();
       if (window.Fx) window.Fx.shear(x, y);
       this.toast(`剪掉 ${info.cut} 根枝条 · 养分 +${reward}`);
       Store.log(`剪去一枝（连带 ${info.cut} 根），树把养分挪给了别的枝头。`, 'grow');
@@ -307,8 +312,9 @@
 
     poke(x, y) {
       const gain = Store.poke();
-      if (window.Fx) window.Fx.poke(x, y);
       if (gain == null) return;
+      if (window.Fx) window.Fx.poke(x, y);
+      if (window.Sound) Sound.poke();
       this.floatText(x, y - 14, '+1');
       this.updateBar();
     },
@@ -372,6 +378,7 @@
         n += 1;
       });
       if (!n) return 0;
+      if (window.Sound) Sound.pick();
       if (n > (s.stats.bigHarvest || 0)) s.stats.bigHarvest = n;
       Store.markPicked(pickedIds);
       const spark = (this.built && this.built.stats && this.built.stats.glow) || '#ffe3a8';
@@ -507,9 +514,12 @@
         feedAt(e.clientX, e.clientY);
       });
 
-      // 模式切换
+      // 模式切换（点击时给一声很轻的木头声，启动时不响）
       document.querySelectorAll('#modes .mode').forEach((b) => {
-        b.onclick = () => this.setMode(b.dataset.mode);
+        b.onclick = () => {
+          if (window.Sound) Sound.ui();
+          this.setMode(b.dataset.mode);
+        };
       });
 
       // 树上点击：修剪 / 收获
@@ -606,11 +616,26 @@
     },
 
     setUiFlag(key, value) {
-      if (key !== 'barsAutoHide') return;
-      Store.state.ui.barsAutoHide = !!value;
-      Store.saveSoon();
-      this.applyBarsAuto();
-      this.toast(value ? '上下栏改成鼠标移入才出现' : '上下栏恢复常驻');
+      const ui = Store.state.ui;
+      if (key === 'barsAutoHide') {
+        ui.barsAutoHide = !!value;
+        Store.saveSoon();
+        this.applyBarsAuto();
+        this.toast(value ? '上下栏改成鼠标移入才出现' : '上下栏恢复常驻');
+        return;
+      }
+      if (key === 'soundOn') {
+        ui.soundOn = !!value;
+        Store.saveSoon();
+        if (window.Sound) Sound.setEnabled(ui.soundOn);
+        this.toast(ui.soundOn ? '音效已开启' : '音效已静音');
+        return;
+      }
+      if (key === 'soundVolume') {
+        ui.soundVolume = clamp(Number(value) || 0, 0, 1);
+        Store.saveSoon();
+        if (window.Sound) Sound.setVolume(ui.soundVolume);
+      }
     },
 
     /* ---------- 窗口几何 ---------- */
@@ -886,6 +911,7 @@
         }
         return;
       }
+      if (window.Sound) Sound.water();
       this.updateSoil();
       this.floatText(x, y, '+' + gain);
       this.sparks(x, y, 6);
@@ -905,6 +931,7 @@
 
     togglePanel(force) {
       const open = typeof force === 'boolean' ? force : !this.panelOpen;
+      if (this._booted && window.Sound) Sound.ui();
       this.panelOpen = open;
       $('#panel').classList.toggle('open', open);
       $('#btnPanel').classList.toggle('on', open);
@@ -991,6 +1018,7 @@
         this.updateBar();
         setTimeout(() => this.renderDock(), 400);
         this.baseBurst(18);
+        if (window.Sound) Sound.levelUp();
         const pot = this.svgPt(230, 638);
         if (window.Fx && pot) window.Fx.levelUp(level, pot.x, pot.y - 24);
         this.toast(unlocked ? `生长周期 ${level} · 收录「${unlocked.name}」` : `生长周期 ${level}`);
@@ -1053,6 +1081,7 @@
         this.updateBar();
         this.updateSoil();
         if (++sec % 2 === 0) this.checkAchievements();
+        if (sec % 5 === 0 && window.Weather) Weather.tick();
         // 摘掉的花果到时间了会长回来，隔 45 秒查一次，有变化才重绘
         if (sec % 45 === 0 && Store.state.picked.length) {
           const before = Store.state.picked.length;
@@ -1113,6 +1142,7 @@
       if (!got || !got.length) return;
       if (got.length === 1) this.toast('成就解锁 · ' + got[0].name, 'ach-toast');
       else this.toast('解锁 ' + got.length + ' 项成就 · 见「成就」页', 'ach-toast');
+      if (window.Sound) Sound.achievement();
       this.baseBurst(Math.min(22, 8 + got.length * 3));
       const p = this.svgPt(230, 638);
       if (window.Fx && p) window.Fx.achievement(p.x, p.y - 46);
