@@ -1046,6 +1046,8 @@
       }
       window.native.onCommand((cmd) => {
         if (!cmd || !cmd.type) return;
+        // 全局热键也算一次用户手势，先把音频唤醒
+        if (window.Sound && (cmd.type === 'feed' || cmd.type === 'toggle-panel')) Sound.resume();
         if (cmd.type === 'toggle-panel') this.togglePanel();
         else if (cmd.type === 'flush-state') Store.save();
         else if (cmd.type === 'feed') this.feed(window.innerWidth / 2 - 60, window.innerHeight - 110);

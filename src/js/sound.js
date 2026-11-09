@@ -112,6 +112,7 @@
 
     /* 一个带包络的振荡器 */
     tone(freq, dur, opts) {
+      if (!this.gestured) return; // 用户还没交互：不要偷偷建 AudioContext
       const o = opts || {};
       const ctx = this.ensure();
       if (!ctx || !this.enabled) return;
@@ -133,6 +134,7 @@
 
     /* 一段过滤噪声（水、木屑、风声都用它） */
     noise(dur, opts) {
+      if (!this.gestured) return;
       const o = opts || {};
       const ctx = this.ensure();
       if (!ctx || !this.enabled) return;
