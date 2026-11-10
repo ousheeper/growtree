@@ -91,6 +91,15 @@
           </div>
 
           <div class="gen-group">
+            <div class="gen-gt">真实天气</div>
+            <label class="gen-toggle" style="margin-top:0">
+              <span class="lb"><span>联网获取真实天气</span><small>按你所在地的实时天气与温度来</small></span>
+              <span class="switch"><input type="checkbox" id="gLive" ${ctx.state.ui.liveWeather ? 'checked' : ''}><i></i></span>
+            </label>
+            <div class="hint-line" style="line-height:1.7">开启后会自动按 IP 定位，从 Open-Meteo（免费、无需注册）拉取当前天气与温度，覆盖内置模拟天气；温度会微调土壤风干速度。<b style="color:var(--muted)">断网或拉取失败会自动回退到内置模拟，不会报错。</b>不联网时保持原来的模拟天气。</div>
+          </div>
+
+          <div class="gen-group">
             <div class="gen-gt">花色</div>
             <div class="palettes" id="gPal"></div>
           </div>
@@ -176,6 +185,10 @@
       /* 上下栏自动隐藏 */
       const barsCb = root.querySelector('#gBars');
       barsCb.onchange = () => ctx.uiFlag('barsAutoHide', barsCb.checked);
+
+      /* 联网真实天气 */
+      const liveCb = root.querySelector('#gLive');
+      liveCb.onchange = () => ctx.uiFlag('liveWeather', liveCb.checked);
 
       /* 花色 */
       const pal = root.querySelector('#gPal');

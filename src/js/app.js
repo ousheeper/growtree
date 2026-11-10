@@ -58,6 +58,7 @@
       if (window.Weather) Weather.init();
       if (window.Season) Season.init();
       if (window.Sky) Sky.init();
+      if (window.LiveWeather) LiveWeather.init();
       this._booted = true;
       if (window.native && window.native.onKeys) window.native.onKeys((p) => this.onKeys(p));
       this.mountInitial();
@@ -568,6 +569,21 @@
         ui.soundVolume = clamp(Number(value) || 0, 0, 1);
         Store.saveSoon();
         if (window.Sound) Sound.setVolume(ui.soundVolume);
+        return;
+      }
+      if (key === 'liveWeather') {
+        ui.liveWeather = !!value;
+        Store.saveSoon();
+        if (window.LiveWeather) {
+          if (ui.liveWeather) {
+            LiveWeather.init();
+            this.toast('已开启联网真实天气 · 正在获取所在地天气…');
+          } else {
+            LiveWeather.stop();
+            if (window.Weather) Weather.apply();
+            this.toast('已关闭联网天气 · 恢复内置模拟天气');
+          }
+        }
       }
     },
 

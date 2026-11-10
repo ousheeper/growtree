@@ -94,8 +94,9 @@
         season: null,
         stats: { clicks: 0, sessions: 0, bornTrees: 1, harvest: { flower: 0, fruit: 0, mushroom: 0, crystal: 0 }, keysToday: 0, keysTotal: 0, keyDay: '', keyNut: 0, soaked: 0, bigHarvest: 0, palettes: [], rains: 0, snows: 0, sold: 0, coinsEarned: 0, coinsSpent: 0, purchases: 0, seasons: [], seasonChanges: 0 },
         weather: null,
+        liveWeather: null,
         plugins: { enabled: null, order: null, active: 'codex', known: [] },
-        ui: { panelOpen: true, alwaysOnTop: true, overlay: false, passThrough: false, scale: 1, stageH: 940, mode: 'water', barsAutoHide: false, soundOn: true, soundVolume: 0.5 }
+        ui: { panelOpen: true, alwaysOnTop: true, overlay: false, passThrough: false, scale: 1, stageH: 940, mode: 'water', barsAutoHide: false, soundOn: true, soundVolume: 0.5, liveWeather: false }
       };
     },
 
@@ -207,8 +208,9 @@
         const dry = w ? w.dry : 1;
         const wet = w ? w.wet : 0;
         const seasonDry = window.Season ? window.Season.dryMul() : 1;
+        const tempDry = window.LiveWeather ? window.LiveWeather.dryMul() : 1;
         const moist = this.moistActive ? (this.moistActive() ? 0.5 : 1) : 1;
-        s.soil = Math.max(0, Math.min(SOIL_MAX, s.soil + (wet - SOIL_DRY * dry * seasonDry * moist) * (dt / 1000)));
+        s.soil = Math.max(0, Math.min(SOIL_MAX, s.soil + (wet - SOIL_DRY * dry * seasonDry * tempDry * moist) * (dt / 1000)));
       }
       this.tickAcc = (this.tickAcc || 0) + dt;
       while (this.tickAcc >= TICK_MS) {
@@ -487,8 +489,8 @@
     },
 
     async resetAll() {
-      await window.native.saveState({});
-      location.reload();
+      // 主进程负责写全新档并 reload；这里不再传空对象，避免被 save 合并逻辑干扰
+      await window.native.resetState();
     },
 
     save() {

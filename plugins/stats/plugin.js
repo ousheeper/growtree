@@ -66,6 +66,7 @@
           card('湿润加成', (Store.soilBonus ? '+' + Store.soilBonus(s.soil) : '+0') + '<small>/4s</small>'),
           card('浇透次数', s.stats.soaked || 0),
           card('当前天气', (window.Weather ? window.Weather.current().name : '晴') + '<small> · ' + (window.Weather && window.Weather.current().id === 'rain' ? '回润' : window.Weather && window.Weather.current().id === 'snow' ? '融雪' : '干燥') + '</small>'),
+          card('实时温度', (window.LiveWeather && window.LiveWeather.enabled() && window.LiveWeather.last() && window.LiveWeather.last().ok && window.LiveWeather.last().temp != null ? Math.round(window.LiveWeather.last().temp) + '°C' + '<small> · ' + (window.LiveWeather.last().city || '所在地') + '</small>' : '—')),
           card('金币', (s.coins || 0).toLocaleString()),
           card('当前季节', (window.Season ? Season.current().name : '—') + '<small> · 卖价 ×' + (window.Season ? Season.sellMul().toFixed(2).replace(/0$/, '') : '1') + '</small>'),
           card('经历降雨', s.stats.rains || 0),

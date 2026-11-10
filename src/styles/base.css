@@ -1331,6 +1331,7 @@ body.rain-fading .rain i { animation-play-state: running; }
 body.wx-sunny .wx { color: var(--gold); border-color: rgba(230, 198, 132, 0.24); }
 body.wx-cloudy .wx { color: #b9b4c9; }
 body.wx-rain .wx { color: #9fc7e8; border-color: rgba(127, 199, 255, 0.3); }
+.wx .wx-temp { font-size: 9px; opacity: 0.85; margin-left: 1px; font-variant-numeric: tabular-nums; }
 
 /* 上下栏自动隐藏时，天气角标也一起收起来 */
 body.bars-auto:not(.bars-show) .wx { opacity: 0; pointer-events: none; }

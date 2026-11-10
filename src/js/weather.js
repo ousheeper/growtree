@@ -97,6 +97,11 @@
 
     current() {
       const s = Store.state;
+      // 联网开启且取到了真实天气：用它覆盖模拟天气
+      if (window.LiveWeather && window.LiveWeather.enabled()) {
+        const lw = window.LiveWeather.last();
+        if (lw && lw.ok && lw.type && TYPES[lw.type]) return TYPES[lw.type];
+      }
       const id = s && s.weather && s.weather.type;
       return TYPES[id] || TYPES.sunny;
     },
@@ -173,6 +178,11 @@
     tick() {
       const s = Store.state;
       if (!s) return;
+      // 联网模式：天气由 LiveWeather 定时刷新，这里只更新角标、不再随机换
+      if (window.LiveWeather && window.LiveWeather.enabled()) {
+        this.updateChip();
+        return;
+      }
       if (!s.weather) {
         this.init();
         return;
@@ -201,8 +211,14 @@
 
       const chip = document.getElementById('wxChip');
       if (chip) {
-        if (this._lastType !== t.id || !chip.innerHTML) {
-          chip.innerHTML = '<span class="wx-ico">' + ICON[t.icon] + '</span><span class="wx-name">' + t.name + '</span>';
+        // 联网模式：天气名后面带上真实温度
+        const lw = window.LiveWeather && window.LiveWeather.enabled() ? window.LiveWeather.last() : null;
+        const temp = lw && lw.ok && lw.temp != null ? Math.round(lw.temp) + '°' : '';
+        const label = '<span class="wx-ico">' + ICON[t.icon] + '</span><span class="wx-name">' + t.name + '</span>' +
+          (temp ? '<span class="wx-temp">' + temp + '</span>' : '');
+        const hadTemp = !!chip.querySelector('.wx-temp');
+        if (this._lastType !== t.id || (!!temp) !== hadTemp || temp !== (chip.querySelector('.wx-temp') || {}).textContent) {
+          chip.innerHTML = label;
         }
         chip.dataset.wx = t.id;
       }

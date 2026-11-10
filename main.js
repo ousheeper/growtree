@@ -3,7 +3,7 @@
  * 桌面生长树 —— 主进程
  * 透明无边框窗口 + 状态持久化 + 托盘/热键 + 插件目录
  */
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, Tray, Menu, nativeImage, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, Tray, Menu, nativeImage, shell, dialog, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
@@ -608,6 +608,74 @@ function startCursorWatch() {
   }, 500);
 }
 
+/* ---------------- 真实天气（Open-Meteo，联网可选） ---------------- */
+/* 用 Electron 的 net 模块发 HTTPS 请求，自动走系统代理，不依赖渲染进程的 CORS。
+ * 三步：IP 定位拿城市名 → 城市名 geocode 拿经纬度 → forecast 拿当前温度 + 天气码。
+ * 任一步失败/超时都返回 {ok:false}，渲染进程回退到内置模拟天气。 */
+
+const WX_TIMEOUT = 8000;
+
+function wxFetch(url) {
+  return new Promise((resolve) => {
+    const req = net.request({ url, method: 'GET' });
+    let done = false;
+    const finish = (data) => {
+      if (done) return;
+      done = true;
+      resolve(data);
+    };
+    const timer = setTimeout(() => {
+      try { req.abort(); } catch (e) {}
+      finish(null);
+    }, WX_TIMEOUT);
+    req.on('response', (res) => {
+      let body = '';
+      res.on('data', (c) => (body += c));
+      res.on('end', () => {
+        clearTimeout(timer);
+        if (res.statusCode !== 200) return finish(null);
+        try { finish(JSON.parse(body)); } catch (e) { finish(null); }
+      });
+      res.on('error', () => { clearTimeout(timer); finish(null); });
+    });
+    req.on('error', () => { clearTimeout(timer); finish(null); });
+    req.end();
+  });
+}
+
+/* 由 IP 反查经纬度（ip-api.com 免费、无需密钥） */
+async function wxLocate() {
+  const d = await wxFetch('http://ip-api.com/json/?fields=lat,lon,city,status');
+  if (!d || d.status !== 'success' || typeof d.lat !== 'number') return null;
+  return { lat: d.lat, lon: d.lon, city: d.city || '' };
+}
+
+/* 按经纬度拿当前天气（Open-Meteo，免费无密钥） */
+async function wxForecast(lat, lon) {
+  const url =
+    'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+    '&current=temperature_2m,weather_code,is_day&temperature_unit=celsius&timezone=auto';
+  const d = await wxFetch(url);
+  if (!d || !d.current) return null;
+  const c = d.current;
+  return {
+    temp: typeof c.temperature_2m === 'number' ? c.temperature_2m : null,
+    code: typeof c.weather_code === 'number' ? c.weather_code : null,
+    isDay: c.is_day === 1,
+    city: null
+  };
+}
+
+ipcMain.handle('wx:fetch', async () => {
+  const loc = await wxLocate();
+  if (!loc) return { ok: false };
+  const w = await wxForecast(loc.lat, loc.lon);
+  if (!w) return { ok: false };
+  w.city = loc.city;
+  w.at = Date.now();
+  return { ok: true, data: w };
+});
+
 /* ---------------- 穿透 / 显示控制 ---------------- */
 function applyIgnore(on) {
   if (!win || win.isDestroyed()) return;
@@ -644,6 +712,22 @@ ipcMain.handle('state:save', (_e, data) => {
     data.ui = Object.assign({}, data.ui, { bounds: win.getBounds() });
   }
   return writeState(data);
+});
+
+/* 重置全部数据：备份旧档后写一个全新档（只保留窗口位置/布局），再 reload。
+ * 不用渲染进程传空对象——空对象会被 save 的 ui 合并逻辑干扰，且 reload 前
+ * 旧渲染进程可能再把旧状态写回来。这里在主进程一次性落地，并用 loadingSave
+ * 锁住 reload 期间的 save。 */
+ipcMain.handle('state:reset', () => {
+  try {
+    const cur = readState();
+    if (cur) fs.writeFileSync(statePath() + '.bak', JSON.stringify(cur, null, 2), 'utf8');
+  } catch (e) { /* ignore */ }
+  const fresh = { ui: { bounds: win && !win.isDestroyed() ? win.getBounds() : null } };
+  if (!writeState(fresh)) return { ok: false };
+  loadingSave = true;
+  scheduleReload();
+  return { ok: true };
 });
 
 /* ---------------- 存档槽 IPC ---------------- */
